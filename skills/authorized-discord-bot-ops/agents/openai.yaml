@@ -1,0 +1,6 @@
+interface:
+  display_name: "Authorized Discord Bot Ops"
+  short_description: "Operate official Discord bots with bounded authority"
+  default_prompt: "Use $authorized-discord-bot-ops to build or operate this official Discord bot safely."
+policy:
+  allow_implicit_invocation: true

@@ -1,0 +1,345 @@
+{
+  "schema_version": "2.0.0",
+  "ledger_id": "discord_voice_control",
+  "created_at": "2026-08-21T23:00:00-05:00",
+  "depth": "DEEP",
+  "iteration": 2,
+  "root": {
+    "kind": "DECISION",
+    "node_id": "root_node",
+    "statement": "Build and privately verify an authorized Discord voice control plane while preserving guild authority, privacy, and explicit live-deployment gates.",
+    "source_state": "A public seed repository exists without implementation and live Discord and Cloudflare credentials are not available to source code.",
+    "target_state": "A tested public implementation and private deployment proof exist, with Socialize either verified under staff authority or named as externally blocked.",
+    "conditions": [
+      "Keep live Discord credentials out of the repository.",
+      "Do not automate a user account or synthesize activity.",
+      "Do not touch the dirty SOL Tools checkout."
+    ],
+    "boundary": "The new repository, the user's authorized Discord applications and test guild, the selected personal Cloudflare account, and the explicitly approved Socialize test window.",
+    "objective_claim_id": "claim_objective",
+    "invariant_ids": ["inv_authority"],
+    "uncertainty_changes_decision": false
+  },
+  "project_model": {
+    "status": "PARTIAL",
+    "facets": {
+      "intent": {
+        "summary": "Ship a reusable official-bot control plane and managed-room bot, prove it privately, then perform only authorized Socialize presence tests.",
+        "knowledge": "KNOWN",
+        "load_bearing": true,
+        "claim_ids": ["claim_objective"],
+        "unknown_disposition": "The user owns subjective acceptance and Socialize staff owns target-guild authorization."
+      },
+      "decision": {
+        "summary": "Implement local and deployment-ready surfaces before credential-gated external actions.",
+        "knowledge": "KNOWN",
+        "load_bearing": true,
+        "claim_ids": ["claim_objective"],
+        "unknown_disposition": "Reopen the host decision if the Cloudflare UDP, DAVE, or lifecycle proof fails."
+      },
+      "acceptance_contract": {
+        "summary": "Pass static, unit, integration, private-guild, DAVE, UDP, lifecycle, security, and evidence gates without unsupported claims.",
+        "knowledge": "KNOWN",
+        "load_bearing": true,
+        "claim_ids": ["claim_unknown"],
+        "unknown_disposition": "Private-guild and target-guild runtime acceptance remain open until credentials and approved windows exist."
+      },
+      "mechanism": {
+        "summary": "Cloudflare HTTP interactions and Durable Object coordination drive a separately authenticated Discord Gateway and Container voice agent.",
+        "knowledge": "KNOWN",
+        "load_bearing": true,
+        "claim_ids": ["claim_unknown"],
+        "unknown_disposition": "Container UDP, DAVE, and lifecycle behavior require live proof."
+      },
+      "current_state_history": {
+        "summary": "The implementation is locally verified on sol/initial-build from baseline cbffafa; Node 24.19 and pnpm 11.19 are pinned; SOL Tools remained dirty and protected.",
+        "knowledge": "KNOWN",
+        "load_bearing": true,
+        "claim_ids": ["claim_unknown"],
+        "unknown_disposition": "Recheck branch, HEAD, credentials, account plan, and live app state before external actions."
+      },
+      "people_incentives": {
+        "summary": "The user owns the repository and deployment; Discord guild staff own installation and retention approval; guild members are affected non-users.",
+        "knowledge": "KNOWN",
+        "load_bearing": true,
+        "claim_ids": ["claim_unknown"],
+        "unknown_disposition": "Do not treat the user's implementation authority as authority over another guild's retention policy."
+      },
+      "lifecycle_recovery": {
+        "summary": "Use circuit breakers, version rollback, compensating D1 migrations, token rotation, app removal, and a conventional-host adapter if Cloudflare proof fails.",
+        "knowledge": "KNOWN",
+        "load_bearing": true,
+        "claim_ids": ["claim_unknown"],
+        "unknown_disposition": "Live rollback and target removal remain unverified until deployment."
+      }
+    },
+    "invariants": [
+      {
+        "id": "inv_authority",
+        "statement": "Do not exceed explicit Discord guild authority, expose credentials, automate a user account, synthesize retention activity, or modify the protected SOL Tools root.",
+        "owner": "User and target-guild staff",
+        "status": "PRESERVED",
+        "hard_gate": true,
+        "evidence_ids": ["ev_local_verify"]
+      }
+    ],
+    "dependencies": [],
+    "stakeholders": []
+  },
+  "authority": {
+    "scope": "Build, test, publish, and deploy the requested official-bot system; live credentials, billing, target permissions, and merge remain human-reserved.",
+    "decision_owner": "Repository owner for implementation; target-guild staff for Socialize actions",
+    "authorized_actions": [
+      "Create and modify the isolated repository.",
+      "Create the public GitHub repository, push the implementation branch, and open a draft pull request.",
+      "Deploy to the selected Cloudflare account after the user enables the required paid plan.",
+      "Perform ordinary authorized Discord UI setup while respecting confirmation gates."
+    ],
+    "forbidden_actions": [
+      "Automate a normal Discord user account or use a user token.",
+      "Generate synthetic activity or bypass inactivity policy.",
+      "Expose secrets or change billing, security prompts, or target permissions for the user.",
+      "Merge the pull request without separate authorization."
+    ],
+    "human_reserved_decisions": [
+      "Cloudflare Workers Paid enrollment, Discord credential creation or revelation, permission confirmation, Socialize installation approval, and pull-request merge."
+    ],
+    "external_state_allowed": true,
+    "hard_gates": [
+      {
+        "id": "gate_authority",
+        "category": "AUTHORITY",
+        "status": "CLEAR",
+        "rationale": "The user authorized repository creation, implementation, publication, and their own deployment; named human gates remain reserved.",
+        "claim_ids": ["claim_unknown"]
+      },
+      {
+        "id": "gate_safety",
+        "category": "SAFETY",
+        "status": "CLEAR",
+        "rationale": "The bounded official-bot design rejects user-token automation, synthetic activity, and voice collection.",
+        "claim_ids": ["claim_unknown"]
+      },
+      {
+        "id": "gate_privacy",
+        "category": "PRIVACY_SECURITY_LEGAL",
+        "status": "CLEAR",
+        "rationale": "Least privilege, signature validation, redaction, no voice collection, and secret isolation are acceptance invariants.",
+        "claim_ids": ["claim_unknown"]
+      },
+      {
+        "id": "gate_external",
+        "category": "IRREVERSIBLE_EXTERNAL_STATE",
+        "status": "CLEAR",
+        "rationale": "GitHub publication and Cloudflare deployment are authorized; merge, billing, credentials, and target permissions remain gated.",
+        "claim_ids": ["claim_unknown"]
+      },
+      {
+        "id": "gate_production",
+        "category": "DESTRUCTIVE_PRODUCTION",
+        "status": "CLEAR",
+        "rationale": "Deployment is in scope only after private evidence and the paid-plan and credential handoffs; destructive cleanup is not authorized.",
+        "claim_ids": ["claim_unknown"]
+      },
+      {
+        "id": "gate_human",
+        "category": "HUMAN_RESERVED",
+        "status": "CLEAR",
+        "rationale": "Billing, credential exposure, permissions, Socialize approval, merge, and subjective acceptance have named human owners.",
+        "claim_ids": ["claim_unknown"]
+      },
+      {
+        "id": "gate_rollback",
+        "category": "ROLLBACK_FAILURE",
+        "status": "CLEAR",
+        "rationale": "Worker and container versions can roll back; D1 changes require compensating migration or point-in-time recovery and leave audit residue.",
+        "claim_ids": ["claim_unknown"]
+      }
+    ]
+  },
+  "companion_findings": {
+    "lead_skill": "HUMAN_CORTEX",
+    "applicable_domains": [],
+    "observation_input": "NONE",
+    "cold_eye_status": "NOT_APPLICABLE",
+    "cold_eye_before_source_inspection": false,
+    "findings": [],
+    "completion_axes": {
+      "functional_implementation": {
+        "status": "NOT_APPLICABLE",
+        "signal": "No player-facing implementation is in the neutral ledger.",
+        "evidence_ids": [],
+        "rationale": "Mark applicable only when the root includes player-facing implementation."
+      },
+      "runtime_integration": {
+        "status": "NOT_APPLICABLE",
+        "signal": "No runnable player-facing surface is in the neutral ledger.",
+        "evidence_ids": [],
+        "rationale": "Mark applicable when a build or runtime surface exists."
+      },
+      "player_eye_presentation": {
+        "status": "NOT_APPLICABLE",
+        "signal": "No visual, UI, gameplay, audio, spatial, animation, or runtime-experience surface is in scope.",
+        "evidence_ids": [],
+        "rationale": "Delegate observation to Human Eye when a player-facing domain becomes applicable."
+      },
+      "evidence_regression_coverage": {
+        "status": "NOT_APPLICABLE",
+        "signal": "No player-facing regression claim is present.",
+        "evidence_ids": [],
+        "rationale": "Mark applicable with player-facing implementation or acceptance work."
+      },
+      "human_acceptance": {
+        "status": "NOT_APPLICABLE",
+        "signal": "No subjective player-facing acceptance decision is in scope.",
+        "evidence_ids": [],
+        "rationale": "Require an explicit human decision whenever subjective acceptance applies."
+      }
+    }
+  },
+  "claims": [
+    {
+      "id": "claim_objective",
+      "label": "MEASURED",
+      "statement": "The isolated repository implementation and its local verification gates are complete; publication and credential-gated live proof are the remaining actions.",
+      "evidence_ids": ["ev_user_plan", "ev_local_verify"],
+      "contradiction_claim_ids": [],
+      "confidence": {
+        "level": "HIGH",
+        "basis": "The user-approved plan, generated source, frozen install, static gates, local tests, security scans, and deploy dry-runs support this bounded claim."
+      }
+    },
+    {
+      "id": "claim_unknown",
+      "label": "UNKNOWN",
+      "statement": "Live Discord credentials, private-guild behavior, Cloudflare Container UDP and DAVE lifecycle behavior, and Socialize retention remain unresolved.",
+      "evidence_ids": ["ev_cloudflare_blocker", "ev_computer_blocker"],
+      "contradiction_claim_ids": [],
+      "confidence": {
+        "level": "LOW",
+        "basis": "No live-guild or deployed Container evidence exists yet."
+      }
+    }
+  ],
+  "evidence": [
+    {
+      "id": "ev_user_plan",
+      "kind": "HUMAN_DECISION",
+      "access": "INSPECTED_CURRENT",
+      "locator": "docs/DECISIONS.md",
+      "captured_at": "2026-08-21T22:22:00-05:00",
+      "integrity": "Project decisions transcribed from the user-approved implementation plan without expanding authority.",
+      "supports_claim_ids": ["claim_objective"],
+      "contradicts_claim_ids": []
+    },
+    {
+      "id": "ev_local_verify",
+      "kind": "TEST_RESULT",
+      "access": "GENERATED_CURRENT",
+      "locator": "docs/TEST_EVIDENCE.md",
+      "captured_at": "2026-08-21T22:22:00-05:00",
+      "integrity": "Sanitized summary of frozen install, formatting, lint, typecheck, builds, 62 package tests, 9 Workers tests, wording, secret, dependency, skill, and deploy-bundle checks.",
+      "supports_claim_ids": ["claim_objective"],
+      "contradicts_claim_ids": []
+    },
+    {
+      "id": "ev_cloudflare_blocker",
+      "kind": "LOG",
+      "access": "INSPECTED_CURRENT",
+      "locator": "docs/RESEARCH.md#unresolved-live-facts",
+      "captured_at": "2026-08-21T22:22:00-05:00",
+      "integrity": "Sanitized current Wrangler response; account identifiers and raw logs are excluded.",
+      "supports_claim_ids": ["claim_unknown"],
+      "contradicts_claim_ids": []
+    },
+    {
+      "id": "ev_computer_blocker",
+      "kind": "LOG",
+      "access": "INSPECTED_CURRENT",
+      "locator": "docs/RESEARCH.md#unresolved-live-facts",
+      "captured_at": "2026-08-21T22:22:00-05:00",
+      "integrity": "Exact pre-window-discovery helper error retained without credentials or screenshots.",
+      "supports_claim_ids": ["claim_unknown"],
+      "contradicts_claim_ids": []
+    }
+  ],
+  "hypotheses": [],
+  "tests": [],
+  "trace": {
+    "bounds": {
+      "max_depth": 6,
+      "max_nodes": 80,
+      "stop_rule": "Expand only branches that can change action, acceptance, mitigation, monitoring, rollback, residual risk, or a human decision."
+    },
+    "nodes": [
+      {
+        "id": "root_node",
+        "kind": "ROOT",
+        "statement": "Implement and test the local system while preserving live-deployment and authority gates.",
+        "claim_id": "claim_unknown",
+        "depth": 0,
+        "terminal": true,
+        "closure_reason": "BOUNDED"
+      }
+    ],
+    "edges": [],
+    "feedback_loops": [],
+    "thresholds": []
+  },
+  "decision": {
+    "iteration_choice": "ESCALATE",
+    "recommendation": "Publish the verified branch through a draft pull request, then hand the named billing, Discord credential, permission, and Socialize authorization gates to their human owners.",
+    "selected_action_ids": [],
+    "rejected_options": [
+      "Do not begin with Socialize or a production voice connection before private-guild and hosting proof."
+    ],
+    "decision_claim_ids": ["claim_objective", "claim_unknown"],
+    "remaining_unknown_claim_ids": ["claim_unknown"],
+    "human_owner": "Repository owner and authorized Discord or Cloudflare account owner",
+    "consecutive_stable_checks": 0,
+    "reopen_trigger": "Re-evaluate architecture if current official APIs, the DAVE stack, Container UDP or lifecycle proof, or target-guild authorization contradicts the plan."
+  },
+  "actions": [],
+  "verification": {
+    "mechanism": {
+      "status": "PASS",
+      "signal": "Signed envelopes, replay, migration-backed Durable Object state, relay limits, managed rooms, voice state transitions, and agent WebSocket behavior pass local tests.",
+      "evidence_ids": ["ev_local_verify"],
+      "rationale": "The local mechanism is exercised without treating mocks or local sockets as live Discord voice evidence."
+    },
+    "endpoint": {
+      "status": "UNKNOWN",
+      "signal": "No actual-outcome measurement has run.",
+      "evidence_ids": [],
+      "rationale": "Separate the real objective from its proxy before endpoint verification."
+    },
+    "guardrails": {
+      "status": "PASS",
+      "signal": "Authorization, least privilege, secret scanning, copy triage, relay suppression, redaction, and protected-root boundaries pass their recorded checks.",
+      "evidence_ids": ["ev_user_plan", "ev_local_verify"],
+      "rationale": "These checks support the local guardrail claim; live guild permissions remain separately unverified."
+    },
+    "recovery": {
+      "status": "UNKNOWN",
+      "signal": "No rollback or recovery test has run.",
+      "evidence_ids": [],
+      "rationale": "Distinguish true rollback from compensating recovery and test it when applicable."
+    }
+  },
+  "closure": {
+    "status": "OPEN",
+    "summary": "Local implementation and verification are complete. Publication is in progress; Discord, Cloudflare Container, private-guild, and Socialize evidence remain open or externally blocked.",
+    "residual_risks": [
+      "Cloudflare Containers may fail a live UDP, DAVE, native-library, or lifecycle gate.",
+      "Socialize may not approve installation or a supported retention mechanism."
+    ],
+    "human_acceptance_required": false,
+    "accepted_by": "",
+    "acceptance_evidence_ids": [],
+    "nonclaims": [
+      "This ledger does not contain hidden chain-of-thought.",
+      "This ledger does not guarantee correctness or completeness.",
+      "This ledger does not grant human acceptance."
+    ]
+  }
+}
