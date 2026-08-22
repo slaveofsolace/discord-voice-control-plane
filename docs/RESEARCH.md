@@ -21,7 +21,7 @@ Checked on 2026-08-21.
 
 ## Unresolved live facts
 
-- Workers Paid is not enabled on the selected account. Container deployment is `BLOCKED` until the user enables it.
+- A prior selected-account check reported that Workers Paid was not enabled. The latest non-interactive check found two available accounts and no configured selection. Container deployment is `BLOCKED` until the user chooses the intended account locally and enables Workers Paid there if still required.
 - A read-only `wrangler containers list` check against the selected personal account returned: `Unauthorized: You do not have access to Cloudflare Containers. Deploying containers requires the Workers Paid plan.` No account ID is stored in this repository.
 - The authorized Computer helper recheck failed before window discovery with `failed to write kernel assets: The system cannot find the path specified. (os error 3)`. Discord portal steps therefore require the manual path described in `DEPLOYMENT.md` unless the helper is repaired outside this repository.
 - The two Discord applications and `VC Control Lab` have not been created or inspected.

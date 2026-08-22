@@ -86,7 +86,7 @@ Use `/voice-admin setup`, inspect the created category and channels, then `/voic
 
 ## 5. Cloudflare Container gate
 
-Current blocker: Workers Paid is not enabled on the selected personal account. The user must enable it manually. No script in this repository performs a billing action.
+Current blockers: a prior selected-account check reported that Workers Paid is required for Container access, while the latest non-interactive recheck found two available Cloudflare accounts and no selected account ID. The user must choose the intended personal account locally and enable Workers Paid there if still required. Do not commit its account ID. No script in this repository performs a billing action.
 
 After that approval:
 

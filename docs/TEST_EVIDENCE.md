@@ -21,18 +21,18 @@ Evidence captured here must be sanitized. Raw command output stays under ignored
 | Strict TypeScript build   | `UNIT TESTED`        | Strict typecheck and all eight workspace builds passed on Node 24.19.0                                          |
 | Package test suite        | `UNIT TESTED`        | 77 tests passed across 14 files                                                                                 |
 | Workers integration suite | `INTEGRATION TESTED` | 13 migration-backed Worker, Durable Object, D1, configuration, restart, alarm, replay, and outbox tests passed  |
-| Copy triage               | `UNIT TESTED`        | Project scanner passed; Anti-AI scanner reported zero candidates across 21 files                                |
-| Secret scan               | `UNIT TESTED`        | Scan passed across 112 tracked and untracked candidate files                                                    |
+| Copy triage               | `UNIT TESTED`        | Project scanner passed across 22 files; Anti-AI scanner reported zero candidates                                |
+| Secret scan               | `UNIT TESTED`        | Scan passed across 113 tracked and untracked candidate files                                                    |
 | Dependency audit          | `UNIT TESTED`        | `pnpm audit --audit-level high` reported no known vulnerabilities                                               |
 | Reusable Discord skill    | `UNIT TESTED`        | Canonical and installed copies validate and compare byte-for-byte                                               |
 | Worker deploy bundles     | `UNIT TESTED`        | Control dry-run passed; host and probe bundles passed with Container rollout disabled locally                   |
-| GitHub Actions            | `INTEGRATION TESTED` | Push run `32551597849` and PR run `32551599391` passed at commit `180abd0`                                      |
+| GitHub Actions            | `INTEGRATION TESTED` | Main run `32552515725` passed at commit `0f52c53`; earlier implementation push/PR runs also passed              |
 | Docker image builds       | `INTEGRATION TESTED` | Both images built in both green CI runs; construction remains unavailable locally                               |
 | Docker/voice runtime      | `UNVERIFIED`         | No image was started on Cloudflare and no live voice transport was exercised                                    |
 | Computer-assisted setup   | `BLOCKED`            | One helper recheck failed before window discovery with missing kernel assets, OS error 3                        |
-| Discord application setup | `UNVERIFIED`         | Applications, credentials, permission confirmations, and private guild remain manual                            |
+| Discord application setup | `BLOCKED`            | No protected Discord variables or ignored live secret files exist; applications and permissions remain manual   |
 | Cloudflare control deploy | `UNVERIFIED`         | No live Worker URL, D1 database, or Durable Object deployment                                                   |
-| Cloudflare voice probe    | `BLOCKED`            | Selected account denied Container access because Workers Paid is not enabled                                    |
+| Cloudflare voice probe    | `BLOCKED`            | Prior account check required Workers Paid; current recheck also requires owner selection between two accounts   |
 | Test-guild commands       | `UNVERIFIED`         | No live Discord applications, credentials, or guild                                                             |
 | Socialize                 | `BLOCKED`            | Staff approval, approved window, approved IDs, operator/removal contacts, and exact target ID were not supplied |
 

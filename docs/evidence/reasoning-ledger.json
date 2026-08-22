@@ -3,7 +3,7 @@
   "ledger_id": "discord_voice_control",
   "created_at": "2026-08-21T23:00:00-05:00",
   "depth": "DEEP",
-  "iteration": 3,
+  "iteration": 4,
   "root": {
     "kind": "DECISION",
     "node_id": "root_node",
@@ -52,7 +52,7 @@
         "unknown_disposition": "Container UDP, DAVE, and lifecycle behavior require live proof."
       },
       "current_state_history": {
-        "summary": "The hardened implementation is locally verified for publication on main; Node 24.19 and pnpm 11.19 are pinned; SOL Tools remained dirty and protected.",
+        "summary": "The hardened implementation is published on a clean main-only remote at checkpoint 0f52c53; main CI, 77 package tests, and 13 Workers tests pass; SOL Tools remained dirty and protected.",
         "knowledge": "KNOWN",
         "load_bearing": true,
         "claim_ids": ["claim_unknown"],
@@ -201,8 +201,8 @@
     {
       "id": "claim_objective",
       "label": "MEASURED",
-      "statement": "The isolated repository implementation and its local verification gates are complete; main publication is authorized and credential-gated live proof remains external.",
-      "evidence_ids": ["ev_user_plan", "ev_local_verify"],
+      "statement": "The isolated implementation, documentation, local verification, CI construction, and main publication gates are complete; credential-gated live proof remains external.",
+      "evidence_ids": ["ev_user_plan", "ev_local_verify", "ev_completion_audit"],
       "contradiction_claim_ids": [],
       "confidence": {
         "level": "HIGH",
@@ -212,8 +212,8 @@
     {
       "id": "claim_unknown",
       "label": "UNKNOWN",
-      "statement": "Live Discord credentials, private-guild behavior, Cloudflare Container UDP and DAVE lifecycle behavior, and Socialize retention remain unresolved.",
-      "evidence_ids": ["ev_cloudflare_blocker", "ev_computer_blocker"],
+      "statement": "Cloudflare account selection and paid-plan state, live Discord credentials and private-guild behavior, Container UDP and DAVE lifecycle behavior, rollback, and Socialize retention remain unresolved.",
+      "evidence_ids": ["ev_cloudflare_blocker", "ev_computer_blocker", "ev_runtime_prerequisites"],
       "contradiction_claim_ids": [],
       "confidence": {
         "level": "LOW",
@@ -247,8 +247,8 @@
       "kind": "LOG",
       "access": "INSPECTED_CURRENT",
       "locator": "docs/RESEARCH.md#unresolved-live-facts",
-      "captured_at": "2026-08-21T22:22:00-05:00",
-      "integrity": "Sanitized current Wrangler response; account identifiers and raw logs are excluded.",
+      "captured_at": "2026-08-21T23:50:00-05:00",
+      "integrity": "Sanitized Wrangler evidence: a prior selected account required Workers Paid, while the current non-interactive check found two accounts and no configured selection; account identifiers and raw logs are excluded.",
       "supports_claim_ids": ["claim_unknown"],
       "contradicts_claim_ids": []
     },
@@ -259,6 +259,26 @@
       "locator": "docs/RESEARCH.md#unresolved-live-facts",
       "captured_at": "2026-08-21T22:22:00-05:00",
       "integrity": "Exact pre-window-discovery helper error retained without credentials or screenshots.",
+      "supports_claim_ids": ["claim_unknown"],
+      "contradicts_claim_ids": []
+    },
+    {
+      "id": "ev_completion_audit",
+      "kind": "ARTIFACT",
+      "access": "GENERATED_CURRENT",
+      "locator": "docs/COMPLETION_AUDIT.md",
+      "captured_at": "2026-08-21T23:50:00-05:00",
+      "integrity": "Requirement-by-requirement matrix derived from the approved plan, current main source, verbose local tests, GitHub state, and separately labelled external live gates.",
+      "supports_claim_ids": ["claim_objective"],
+      "contradicts_claim_ids": []
+    },
+    {
+      "id": "ev_runtime_prerequisites",
+      "kind": "LOG",
+      "access": "GENERATED_CURRENT",
+      "locator": "docs/COMPLETION_AUDIT.md#external-live-gates",
+      "captured_at": "2026-08-21T23:50:00-05:00",
+      "integrity": "Sanitized read-only gate check: required Cloudflare and Discord variables are unset and no ignored live secret file exists; no values or account identifiers are recorded.",
       "supports_claim_ids": ["claim_unknown"],
       "contradicts_claim_ids": []
     }
@@ -288,7 +308,7 @@
   },
   "decision": {
     "iteration_choice": "ESCALATE",
-    "recommendation": "Fast-forward the verified implementation to main, remove only the redundant task branch, then hand the named billing, Discord credential, permission, and Socialize authorization gates to their human owners.",
+    "recommendation": "Keep the main implementation unchanged and hand Cloudflare account selection and paid-plan state, protected Discord setup, and Socialize authorization to their named human owners before any live action.",
     "selected_action_ids": [],
     "rejected_options": [
       "Do not begin with Socialize or a production voice connection before private-guild and hosting proof."
@@ -296,7 +316,7 @@
     "decision_claim_ids": ["claim_objective", "claim_unknown"],
     "remaining_unknown_claim_ids": ["claim_unknown"],
     "human_owner": "Repository owner and authorized Discord or Cloudflare account owner",
-    "consecutive_stable_checks": 0,
+    "consecutive_stable_checks": 1,
     "reopen_trigger": "Re-evaluate architecture if current official APIs, the DAVE stack, Container UDP or lifecycle proof, or target-guild authorization contradicts the plan."
   },
   "actions": [],
@@ -328,7 +348,7 @@
   },
   "closure": {
     "status": "OPEN",
-    "summary": "Local implementation and verification are complete and main publication is authorized. Discord, Cloudflare Container, private-guild, and Socialize evidence remain open or externally blocked.",
+    "summary": "Implementation, documentation, local verification, CI construction, and main publication are complete. Cloudflare deployment, private-guild proof, rollback, and Socialize evidence remain externally blocked or unverified.",
     "residual_risks": [
       "Cloudflare Containers may fail a live UDP, DAVE, native-library, or lifecycle gate.",
       "Socialize may not approve installation or a supported retention mechanism."

@@ -12,5 +12,6 @@
 - Added ordered Durable Object state recovery, bounded agent offline recovery, daily audit retention, managed-guild allowlisting, and restart-safe empty-room cleanup.
 - Made Discord voice readiness depend on DAVE observation and added controlled voice rejoin, Gateway reauthentication, two-run Container lifecycle, and clean SIGTERM evidence gates.
 - Made relay delivery idempotent through Discord's enforced message nonce and tightened initial D1 provisioning, secret rotation, and deployment-variable handling.
+- Added a requirement-by-requirement completion audit and a sanitized current record of the Cloudflare account-selection, private Discord, and Socialize release gates.
 
 No Discord or Cloudflare live verification is claimed by this entry.

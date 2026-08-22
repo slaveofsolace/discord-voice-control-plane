@@ -5,7 +5,7 @@
 - Public MIT repository: <https://github.com/slaveofsolace/discord-voice-control-plane>
 - Authoritative branch: `main`
 - Pull request #1 retains the initial review history. Its temporary source branch was fast-forwarded into `main` and removed after verification.
-- The final handoff requires a clean working tree, `main` tracking `origin/main`, and a successful main-branch CI run.
+- The current handoff has a clean working tree, `main` tracking `origin/main`, no other remote branches, and a successful main-branch CI run.
 - Source, migrations, ID-free Wrangler configuration, Dockerfiles, local examples, deployment and rollback scripts, CI, security checks, operator documentation, and the reusable Discord operations skill are included.
 
 Repository publication is complete. Publication does not upgrade any live Discord, Cloudflare, or target-guild claim.
@@ -48,9 +48,10 @@ Cloudflare Container hosting is accepted only if the dedicated probe passes ever
 
 - `UNIT TESTED`: clean `pnpm verify` passed formatting, typed lint, strict typecheck, all eight workspace builds, and 77 package tests across 14 files.
 - `INTEGRATION TESTED`: 13 migration-backed Workers, Durable Object, D1, alarm, outbox, restart, authorization, and configuration tests passed.
-- `UNIT TESTED`: copy triage passed across 21 files; secret scanning passed across 112 candidate files; the high-severity dependency audit reported no known vulnerabilities.
+- `UNIT TESTED`: copy triage passed across 22 files; secret scanning passed across 113 candidate files; the high-severity dependency audit reported no known vulnerabilities.
 - `UNIT TESTED`: all three Worker bundles passed Wrangler dry-runs. The two Container-backed Workers were bundled locally with Container rollout disabled because Docker is unavailable on this machine.
 - `INTEGRATION TESTED`: GitHub Actions runs `32551597849` and `32551599391` passed the complete verification, both Docker image builds, scans, dependency audit, and control Worker dry-run at commit `180abd0594980d0dbcaeddfa5cab53914bb54016`.
+- `INTEGRATION TESTED`: main-branch run `32552515725` passed the same repository and image-construction gates at commit `0f52c5332f1dbdb17fd04438e4e918a94c26fad9`.
 - `UNIT TESTED`: the canonical and installed `authorized-discord-bot-ops` skill copies validate and match byte-for-byte.
 - `UNVERIFIED`: no local Docker runtime, live Discord application, Discord voice transport, Cloudflare Container, or target-guild behavior is counted by these results.
 
@@ -58,7 +59,7 @@ Cloudflare Container hosting is accepted only if the dedicated probe passes ever
 
 The control Worker, D1 database, Durable Object, private voice host, and probe are not deployed. No live URL, production database ID, Container revision, probe report, or rollback exercise exists.
 
-Cloudflare voice deployment is `BLOCKED`. The selected account reported that Container access requires Workers Paid. Billing was not automated. The user must enable that plan manually before deployment resumes.
+Cloudflare voice deployment is `BLOCKED`. A prior selected-account check reported that Container access requires Workers Paid. The current non-interactive recheck found two available accounts and no configured account selection, so the owner must first choose the intended account locally and then enable Workers Paid there if still required. Billing was not automated, and no account ID is committed.
 
 The private `VC Control Lab` guild and its two applications are also `UNVERIFIED`. The authorized Computer helper was retried once and failed before window discovery with missing kernel assets, OS error 3. Login, MFA, CAPTCHA, credential display, token copying, security prompts, and permission confirmation remain manual in every case.
 
@@ -76,7 +77,7 @@ The conventional-host fallback uses the same voice-agent image and authenticated
 
 ## 10. Remaining Work
 
-1. The user manually enables Workers Paid on the selected Cloudflare account without sharing billing information.
+1. The user locally selects the intended Cloudflare account and manually enables Workers Paid there if still required, without sharing billing information or committing the account ID.
 2. An authorized operator creates `VC Control Lab`, `VC Control`, and `Voice Rooms`, handles protected credentials and permission confirmations, and completes the live private-guild command matrix.
 3. Deploy the control plane, run two fail-closed Container probe cycles, capture clean SIGTERM and distinct-run evidence, then choose Cloudflare or the documented conventional host from the result.
 4. Socialize staff completes `SOCIALIZE_INTAKE.md`. During the approved window, test only official-bot presence controls and one ordinary relay, then observe deletion without synthetic activity.
