@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest";
 
-import { controlEnvironmentSchema, voiceEnvironmentSchema, voiceHostModeSchema } from "./index.js";
+import {
+  controlEnvironmentSchema,
+  userRpcEnvironmentSchema,
+  voiceEnvironmentSchema,
+  voiceHostModeSchema
+} from "./index.js";
 
 const base = {
   DEPLOYMENT_ID: "test",
@@ -117,5 +122,42 @@ describe("voice host mode", () => {
         PROBE_STABLE_MS: "999999"
       })
     ).toThrow();
+  });
+});
+
+describe("authorized local RPC environment", () => {
+  const userRpcBase = {
+    DEPLOYMENT_ID: "test-rpc",
+    TENANT_ID: "test",
+    USER_RPC_DISCORD_APPLICATION_ID: "100000000000000001",
+    USER_RPC_DISCORD_ACCESS_TOKEN: "oauth-access-token-value",
+    USER_RPC_ALLOWED_GUILD_ID: "100000000000000002",
+    USER_RPC_EXPECTED_USER_ID: "100000000000000003",
+    AGENT_ENDPOINT: "wss://example.test/agent/ws",
+    AGENT_AUTH_SECRET: "x".repeat(32),
+    AGENT_KEY_ID: "v1"
+  };
+
+  it("requires exact expected-user and allowed-guild bindings", () => {
+    expect(userRpcEnvironmentSchema.parse(userRpcBase)).toMatchObject({
+      USER_RPC_ALLOWED_GUILD_ID: "100000000000000002",
+      USER_RPC_EXPECTED_USER_ID: "100000000000000003"
+    });
+    expect(() =>
+      userRpcEnvironmentSchema.parse({ ...userRpcBase, USER_RPC_EXPECTED_USER_ID: "" })
+    ).toThrow();
+  });
+
+  it("retains the same strict agent key-rotation boundary", () => {
+    expect(() =>
+      userRpcEnvironmentSchema.parse({ ...userRpcBase, AGENT_PREVIOUS_KEY_ID: "v0" })
+    ).toThrow("configured together");
+    expect(() =>
+      userRpcEnvironmentSchema.parse({
+        ...userRpcBase,
+        AGENT_PREVIOUS_KEY_ID: "v0",
+        AGENT_PREVIOUS_AUTH_SECRET: userRpcBase.AGENT_AUTH_SECRET
+      })
+    ).toThrow("secrets must differ");
   });
 });

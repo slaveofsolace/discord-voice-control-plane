@@ -15,6 +15,13 @@ Before a live guild action, capture:
 
 An interaction-only control app can use the `applications.commands` install scope without a bot user in the guild. Register commands using a short-lived client-credentials token with `applications.commands.update`; do not put that credential in the runtime Worker.
 
+## Target guild installation
+
+- A server-installed application must be approved by a member who currently holds Discord's `MANAGE_GUILD` permission or Administrator. A staff title without that effective permission is not enough.
+- The approver and installer may be different people. Record both, lock the OAuth2 install URL to the exact authorized guild, and use the presence-only permission bitset for a third-party temporary room.
+- A bot user is Discord's dedicated automation identity and cannot accept a normal invite. Never replace a missing guild install with a user token, a standard-user session, or self-bot automation.
+- If no authorized installer exists, stop and report the installation blocker. Do not broaden permissions or change identity type to work around it.
+
 ## Voice invariants
 
 - Connect as an official bot, self-muted and self-deafened.

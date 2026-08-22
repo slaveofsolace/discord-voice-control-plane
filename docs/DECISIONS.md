@@ -13,5 +13,9 @@ These decisions come from the approved implementation plan. A later change requi
 - Billing: the user alone enables Workers Paid. No billing action is automated.
 - Discord UI: ordinary setup may be automated when already authenticated; login, MFA, CAPTCHA, security prompts, permission confirmations, and credential display or copying remain manual.
 - Socialize: staff approval and exact target IDs are required. No third-party commands, synthetic activity, or channel management.
+- Target feasibility: the user confirmed that an official bot installation is not available in Socialize. Treat that constraint as authoritative; do not keep presenting a `MANAGE_GUILD` installer as the target solution.
+- Authorized user path: the optional target adapter may use only Discord's documented local RPC interface after Discord partner/tester access and explicit OAuth authorization. It never accepts a raw user token, drives Discord UI, opens a user Gateway, sends audio, or sends a message as the user.
+- Account profiles: begin with the user's currently authorized desktop account and bind it to the authenticated user ID. A later separate Discord account uses a separately authorized local profile without code or Cloudflare changes.
+- Local draft boundary: RPC relay selects the exact authorized text channel and stages sanitized text locally. The receipt says `USER_SEND_REQUIRED`; only the user performs the final Discord send.
 - Evidence: unit, integration, live test-guild, and target-guild labels are separate. Unobserved behavior stays `UNVERIFIED` or `BLOCKED`.
 - Branch hygiene: inspect exact local and remote refs before deletion. Delete only task branches proven redundant with `main`; do not infer that an unrelated branch is stale.

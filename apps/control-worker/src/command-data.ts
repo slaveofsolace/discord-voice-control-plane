@@ -13,7 +13,7 @@ export const controlApplicationCommand = {
     {
       type: 1,
       name: "relay",
-      description: "Relay one safe plain-text message",
+      description: "Send with the bot or stage a local user draft",
       options: [
         {
           type: 3,

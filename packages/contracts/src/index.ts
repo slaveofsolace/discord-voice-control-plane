@@ -131,6 +131,8 @@ export type CommandStartAck = z.infer<typeof commandStartAckSchema>;
 export const agentStatusSchema = z.object({
   type: z.literal("status"),
   deployment_id: z.string().min(1).max(64),
+  agent_kind: z.enum(["bot_gateway", "authorized_local_rpc"]).optional(),
+  local_rpc_connected: z.boolean().optional(),
   desired_connected: z.boolean(),
   observed_state: voiceSessionStateSchema,
   gateway_connected: z.boolean(),

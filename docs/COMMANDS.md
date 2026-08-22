@@ -35,3 +35,5 @@ The same actions are registered under `/voice`. Prefix user arguments accept onl
 `/vc status|join|leave|reconnect|pause|resume|relay|diagnostics|audit`
 
 Reconnect and audit require the elevated allowlist. Audit defaults to 10 rows and caps at 50.
+
+`/vc join` never accepts a guild or channel argument. The deployment chooses one agent type and uses only its stored exact target. In official-bot mode, `relay` sends one sanitized bot message. In authorized local RPC mode, `relay` selects the stored text channel and copies the sanitized draft to the local clipboard; its receipt is `USER_SEND_REQUIRED` and no Discord message has been sent.

@@ -12,6 +12,7 @@ import {
 } from "discord.js";
 
 import { voiceEnvironmentSchema } from "@discord-vc-control/config";
+import { AgentClient } from "@discord-vc-control/agent-client";
 import {
   voiceSessionStateSchema,
   type AgentBootstrap,
@@ -21,7 +22,6 @@ import {
 } from "@discord-vc-control/contracts";
 import { redactSecrets } from "@discord-vc-control/security";
 
-import { AgentClient } from "./agent-client.js";
 import { ManagedRoomService } from "./managed-rooms.js";
 import { parsePrefixCommand, voiceSubcommands, type VoiceSubcommand } from "./prefix.js";
 import { asVoiceAdminSubcommand, requiresManageChannels } from "./voice-admin-authorization.js";

@@ -17,10 +17,11 @@ Repository publication is complete. Publication does not upgrade any live Discor
 - Message Content is required only when a deployment explicitly enables `!voice` and `!v`; the public template leaves both related flags off.
 - A successful Container image build or HTTP health check does not establish Discord voice compatibility. DNS, HTTPS, Gateway, UDP discovery, DAVE, silent stability, recovery, native compatibility, clean termination, and lifecycle restart require a live probe.
 - Normal official-bot presence is not assumed to preserve a third-party temporary room. That behavior must be measured during a staff-approved window without synthetic activity.
+- The user confirmed that Socialize cannot use the official bot-install route. The optional target adapter is limited to Discord-approved local RPC with explicit OAuth and an expected-user profile. It has no raw user-token, user-Gateway, UI-keystroke, automatic-message, or microphone-injection mode.
 
 ## 3. Architecture Decision
 
-Cloudflare hosts the signed interaction endpoint, D1 configuration and audit records, the SQLite-backed `AgentSession` Durable Object, and the private voice-host controller. The voice bot runs as one isolated agent process per deployment.
+Cloudflare hosts the signed interaction endpoint, D1 configuration and audit records, the SQLite-backed `AgentSession` Durable Object, and the private voice-host controller. The official voice bot runs as one isolated Container agent per deployment. An optional separate deployment can run a profile-bound agent beside Discord desktop on Windows and use the same signed control path through documented local RPC.
 
 Cloudflare Container hosting is accepted only if the dedicated probe passes every fail-closed field twice with different run IDs and clean SIGTERM evidence. If UDP, DAVE, native compatibility, restart, or lifecycle behavior fails, the Cloudflare control plane remains in place and the same voice-agent image moves to the Docker Compose/systemd adapter on an authorized conventional host. See `ADR-001-voice-agent-hosting.md`.
 
@@ -34,6 +35,7 @@ Cloudflare Container hosting is accepted only if the dedicated probe passes ever
 - Versioned HMAC envelopes, signed WebSocket challenge, replay cache, idempotency receipts, heartbeats, circuit breaker, and ordered recovery outboxes.
 - A DAVE-gated voice state machine with bounded retry, controlled rejoin, moderator-removal blocking, self-mute/self-deaf, and no audio receive or send path.
 - A private Container host that controls separately named production and probe Containers under one bot-token boundary, plus a conventional-host fallback.
+- A Windows-local Discord RPC adapter with bounded IPC framing, OAuth code exchange/refresh, exact user/guild/target binding, non-forced voice selection, fail-closed disconnect handling, and manual-send draft staging.
 
 ## 5. Security Controls
 
@@ -43,6 +45,7 @@ Cloudflare Container hosting is accepted only if the dedicated probe passes ever
 - Discord relay uses NFC normalization, a 1,000-character limit, C0/C1 and bidi rejection, command-prefix rejection, empty mention parsing, two rate-limit scopes, and an enforced deterministic message nonce. Audits retain metadata rather than relay text.
 - The presence-only profile requests only View Channel, Connect, Send Messages, and Read Message History. Managed rooms additionally request Manage Channels, Manage Roles, and Move Members. Neither profile requests Administrator, Manage Guild, Kick Members, Ban Members, or Manage Webhooks.
 - The control Worker cannot read the Voice Rooms bot token. Logs and committed evidence exclude secrets, relay content, and unnecessary account identifiers.
+- Local RPC profiles are ignored and restricted to the current OS user. The adapter accepts only official OAuth tokens, never a raw Discord user token, and reports Gateway, UDP, DAVE, and audio state as unowned or unobservable.
 
 ## 6. Verification Evidence
 
@@ -61,15 +64,15 @@ Workers Paid is active on the selected test account. The control Worker, D1 data
 
 Cloudflare voice deployment is `UNVERIFIED`, not billing-blocked. Authenticated account UI shows Workers Paid as the current plan and Containers included. No Worker, D1 database, Durable Object, or Container has been deployed, and no account ID or billing detail is committed.
 
-The private `VC Control Lab` server, `voice-control`, and `voice-probe` exist and were observed in authenticated live UI. `VC Control` and `Voice Rooms` now exist; their public identifiers are stored only in an ignored local runtime file, and no credential was opened or copied. Every command, Gateway, voice, intent, credential, and permission path remains `UNVERIFIED`. Login, MFA, CAPTCHA, credential display, token copying, security prompts, privileged-intent changes, and permission confirmations retain their protected boundaries. The owner completed the Cloudflare payment step; authenticated UI shows Workers Paid as the current plan.
+The private `VC Control Lab` server, `voice-control`, and `voice-probe` exist and were observed in authenticated live UI. `VC Control` and `Voice Rooms` exist; Discord confirmed the VC Control lab install, while Voice Rooms is staged at the final exact seven-permission consent. Their public identifiers are stored only in an ignored local runtime file, and no credential was opened or copied. Every command, Gateway, voice, intent, and credential path remains `UNVERIFIED`. Login, MFA, CAPTCHA, credential display, token copying, security prompts, privileged-intent changes, and permission confirmations retain their protected boundaries. The owner completed the Cloudflare payment step; authenticated UI shows Workers Paid as the current plan.
 
 During channel-ID inspection, Discord's `Open Chat` control unexpectedly joined the operator's user account to `voice-probe`. It was immediately disconnected; Discord displayed input error 3002 and no message was sent. This event is an operational incident, not bot, Gateway, UDP, DAVE, or hosting verification.
 
 ## 8. Target-Guild State
 
-Socialize is `BLOCKED`. Staff has not supplied an approval reference, approved window, approved application and bot IDs, target guild ID, exact temporary voice-channel ID, operator list, or removal contact. No target was authorized, joined, relayed to, modified, or measured.
+Socialize is `BLOCKED`. The user confirmed that the official-bot install route is unavailable. Discord RPC partner/tester access, an authorized persistent local desktop session, a staff approval reference and window, confirmed application/account/guild facts, exact temporary voice/chat IDs, operator scope, and incident/removal contacts have not been supplied. No target was authorized, joined, drafted to, modified, or measured.
 
-Presence-only behavior and deletion timing are `UNVERIFIED`. The terminal retention phrase is used only after a live approved observation proves official-bot presence insufficient and staff confirms that no supported persistent or exempt configuration exists.
+Presence-only behavior and deletion timing are `UNVERIFIED`. The terminal retention phrase is used only after a live approved observation proves normal authorized-member presence insufficient and staff confirms that no supported persistent or exempt configuration exists.
 
 ## 9. Rollback
 
@@ -79,7 +82,7 @@ The conventional-host fallback uses the same voice-agent image and authenticated
 
 ## 10. Remaining Work
 
-1. Complete the protected Message Content, token, and permission steps for the two existing applications, then register commands and run the live private-guild command matrix in `VC Control Lab`.
+1. Authorize the staged Voice Rooms install, then complete Message Content and protected credential steps, register commands, and run the live private-guild command matrix in `VC Control Lab`.
 2. Deploy the control plane, run two fail-closed Container probe cycles, capture clean SIGTERM and distinct-run evidence, then choose Cloudflare or the documented conventional host from the result.
-3. Socialize staff completes `SOCIALIZE_INTAKE.md`. During the approved window, test only official-bot presence controls and one ordinary relay, then observe deletion without synthetic activity.
+3. Obtain Discord RPC partner/tester access and prove the profile-bound local adapter. Socialize staff then completes `SOCIALIZE_INTAKE.md`; during the approved window, test only the named member's presence controls and optional manual-send draft handoff, then observe deletion without synthetic activity.
 4. Exercise rollback and credential rotation in the private environment. Until those actions occur, the corresponding labels remain `UNVERIFIED` or `BLOCKED`.

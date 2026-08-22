@@ -13,6 +13,10 @@
 !apps/voice-agent/dist/**
 
 !packages/
+!packages/agent-client/
+!packages/agent-client/package.json
+!packages/agent-client/dist/
+!packages/agent-client/dist/**
 !packages/contracts/
 !packages/contracts/package.json
 !packages/contracts/dist/

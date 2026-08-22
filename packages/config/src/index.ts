@@ -137,6 +137,53 @@ export const voiceEnvironmentSchema = z
     }
   });
 
+export const userRpcEnvironmentSchema = z
+  .object({
+    DEPLOYMENT_ID: z.string().min(1).max(64),
+    TENANT_ID: z.string().min(1).max(64),
+    USER_RPC_DISCORD_APPLICATION_ID: snowflakeSchema,
+    USER_RPC_DISCORD_ACCESS_TOKEN: z.string().min(16),
+    USER_RPC_ALLOWED_GUILD_ID: snowflakeSchema,
+    USER_RPC_EXPECTED_USER_ID: snowflakeSchema,
+    AGENT_ENDPOINT: z.url().refine((url) => url.startsWith("wss://"), "Expected wss:// URL"),
+    AGENT_AUTH_SECRET: z.string().min(32),
+    AGENT_PREVIOUS_AUTH_SECRET: z.string().min(32).optional(),
+    AGENT_KEY_ID: z.string().min(1).max(64),
+    AGENT_PREVIOUS_KEY_ID: z.string().min(1).max(64).optional()
+  })
+  .superRefine((value, context) => {
+    if (
+      (value.AGENT_PREVIOUS_KEY_ID === undefined) !==
+      (value.AGENT_PREVIOUS_AUTH_SECRET === undefined)
+    ) {
+      context.addIssue({
+        code: "custom",
+        message: "Previous agent key ID and secret must be configured together",
+        path: ["AGENT_PREVIOUS_KEY_ID"]
+      });
+    }
+    if (
+      value.AGENT_PREVIOUS_KEY_ID !== undefined &&
+      value.AGENT_PREVIOUS_KEY_ID === value.AGENT_KEY_ID
+    ) {
+      context.addIssue({
+        code: "custom",
+        message: "Current and previous agent key IDs must differ",
+        path: ["AGENT_PREVIOUS_KEY_ID"]
+      });
+    }
+    if (
+      value.AGENT_PREVIOUS_AUTH_SECRET !== undefined &&
+      value.AGENT_PREVIOUS_AUTH_SECRET === value.AGENT_AUTH_SECRET
+    ) {
+      context.addIssue({
+        code: "custom",
+        message: "Current and previous agent secrets must differ",
+        path: ["AGENT_PREVIOUS_AUTH_SECRET"]
+      });
+    }
+  });
+
 export const voiceHostModeSchema = z
   .object({
     HOST_ENABLED: booleanString,
@@ -166,5 +213,6 @@ export const voiceHostModeSchema = z
   });
 
 export type ControlEnvironment = z.infer<typeof controlEnvironmentSchema>;
+export type UserRpcEnvironment = z.infer<typeof userRpcEnvironmentSchema>;
 export type VoiceEnvironment = z.infer<typeof voiceEnvironmentSchema>;
 export type VoiceHostMode = z.infer<typeof voiceHostModeSchema>;

@@ -5,6 +5,7 @@ export default defineConfig({
     include: [
       "packages/**/*.test.ts",
       "apps/control-worker/src/**/*.test.ts",
+      "apps/user-rpc-agent/**/*.test.ts",
       "apps/voice-agent/**/*.test.ts",
       "scripts/**/*.test.ts",
       "spikes/**/*.test.ts"

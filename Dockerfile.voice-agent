@@ -8,6 +8,7 @@ RUN groupadd --system --gid 10001 voiceagent \
 
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 COPY apps/voice-agent/package.json apps/voice-agent/package.json
+COPY packages/agent-client/package.json packages/agent-client/package.json
 COPY packages/contracts/package.json packages/contracts/package.json
 COPY packages/config/package.json packages/config/package.json
 COPY packages/security/package.json packages/security/package.json
@@ -16,6 +17,7 @@ RUN corepack enable \
   && pnpm install --frozen-lockfile --prod --filter @discord-vc-control/voice-agent...
 
 COPY apps/voice-agent/dist apps/voice-agent/dist
+COPY packages/agent-client/dist packages/agent-client/dist
 COPY packages/contracts/dist packages/contracts/dist
 COPY packages/config/dist packages/config/dist
 COPY packages/security/dist packages/security/dist

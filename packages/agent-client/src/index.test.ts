@@ -9,7 +9,7 @@ import {
   verifyAgentHandshake
 } from "@discord-vc-control/security";
 
-import { AgentClient } from "./agent-client.js";
+import { AgentClient } from "./index.js";
 
 const currentSecret = "current-agent-secret-with-at-least-32-bytes";
 const previousSecret = "previous-agent-secret-with-at-least-32-bytes";

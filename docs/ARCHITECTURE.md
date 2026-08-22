@@ -12,15 +12,21 @@ Control Worker -- D1 audit/config
 AgentSession Durable Object
         ^
         |
-Voice Agent in named Container -- Discord Gateway + voice UDP
-        ^
+        +-- Voice Agent in named Container -- bot Gateway + voice UDP
+        |        ^
+        |        |
+        |   Private Voice Host Worker -- bot token + Container lifecycle
         |
-Private Voice Host Worker -- bot token and Container lifecycle
+        +-- Optional Windows user RPC agent -- local Discord IPC + OAuth profile
 ```
 
 VC Control is an interaction-only Discord application. Its Worker holds the Discord public key, control allowlists, command-signing key, and internal-status secret. It never receives the Voice Rooms bot token.
 
 Voice Host is not routed publicly. It alone reads the bot token and can pass it to the named production agent Container or the separately named probe Container. Its validated mode schema rejects starting both same-token Containers concurrently. The probe is invoked through the same private Worker boundary and has no independent secret binding. The Voice Agent opens outbound Discord Gateway, voice WebSocket, and UDP connections. It exposes only a Container-internal HTTP health endpoint containing service health and observed state, not guild or channel IDs.
+
+The optional user RPC agent is a separate deployment, not a Container replacement for the bot. It runs beside an authenticated Discord desktop client on Windows and communicates through Discord's documented local IPC pipe. Its ignored profile holds an OAuth access/refresh token, client secret, expected user ID, application ID, redirect URI, and one allowed guild. The Cloudflare control plane receives none of those credentials. A profile can be reauthorized for a different Discord user without changing contracts or code.
+
+The RPC adapter can select the authorized voice channel, leave it, observe the selected channel, and select the authorized text channel. It cannot send a guild message through RPC and cannot observe or inject Discord's audio transport. In response to `relay`, it selects the exact authorized text channel and copies a sanitized draft to the local clipboard, returning `USER_SEND_REQUIRED`. UI keystrokes, raw user tokens, and user Gateway sessions are outside this architecture.
 
 AgentSession is one SQLite-backed Durable Object per deployment. It stores desired and observed state, Discord interaction claims, replay nonces, pending and executing commands, receipts, server-received heartbeats, and D1 audit/state reconciliation queues. The audit queue refuses new control actions at capacity. State snapshots coalesce by object key; permanent conflicts move to a visible dead-letter state that blocks agent bootstrap until a newer valid snapshot reconciles it. D1 stores deployment configuration, authorized target, managed rooms, bot-owned ACL records, receipts, and redacted audit events.
 
@@ -36,7 +42,7 @@ Every bootstrap, command envelope, heartbeat, and persistent record carries `ten
 4. The Worker normalizes relay text, writes a content-free audit record or fails closed, signs a tenant/deployment-bound 30-second command, and defers the Discord response.
 5. AgentSession rejects wrong tenants or deployments, expired MACs, and replayed nonces, then queues or forwards the command.
 6. The Voice Agent completes authenticated bootstrap before processing serialized messages. It asks AgentSession to move the command into the durable executing ledger before side effects. A lost acknowledgement fails closed instead of replaying the effect after restart.
-7. The agent verifies the same tenant/deployment boundary, executes only the stored target, returns a receipt, and emits observed state every 15 seconds. Agent sessions expire after five minutes and are closed after 45 seconds without a server-received heartbeat or when their key is retired.
+7. The selected agent verifies the same tenant/deployment boundary, executes only the stored target, returns a receipt, and emits observed state every 15 seconds. A deployment uses one agent type. Agent sessions expire after five minutes and are closed after 45 seconds without a server-received heartbeat or when their key is retired.
 8. AgentSession retains receipts and executing records for 24 hours, updates audit result, and retries D1 audit or state writes through alarms after transient failure.
 9. Relay delivery includes a deterministic Discord nonce with enforcement so a retry cannot create a second message through Discord's create-message path.
 

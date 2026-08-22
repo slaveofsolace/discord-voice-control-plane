@@ -25,9 +25,13 @@ Create a private guild named `VC Control Lab` and two applications:
 1. `VC Control`: do not add a bot user. Enable Guild Install with `applications.commands` only.
 2. `Voice Rooms`: add the official bot user and install only the selected permission profile from `BOT_PERMISSIONS.md`.
 
+The installing person must currently hold Manage Server (`MANAGE_GUILD`) or Administrator in the selected guild. A moderator or staff role without that effective permission cannot complete Discord's server-install consent. That person may be different from the day-to-day operator and only needs to perform the one-time OAuth2 guild install. The optional Discord-approved local RPC adapter in section 7 is a distinct desktop deployment, not a bot-install bypass.
+
+For an existing third-party room, set `VOICE_INSTALL_PROFILE=presence-only`, the exact approved application and guild IDs, and run `pnpm install:url:voice`. Give the generated ignored shortcut only to the named installer from the authorization record. The shortcut locks the guild picker and requests only `applications.commands`, `bot`, and the four presence permissions.
+
 Ordinary already-authenticated portal setup may use authorized Computer control. Stop for login, MFA, CAPTCHA, security or privacy prompts, permission confirmation, client-secret display, or bot-token display. The user completes those steps.
 
-Current live checkpoint: authorized Computer control created the private `VC Control Lab` server, `voice-control`, `voice-probe`, and `VC Control` application. The owner cleared Discord's hCaptcha and `Voice Rooms` now exists. Public application identifiers are retained only in an ignored local runtime file. Credential display, privileged-intent changes, and permission grants remain protected action-time steps.
+Current live checkpoint: authorized Computer control created the private `VC Control Lab` server, `voice-control`, `voice-probe`, and both applications. Discord confirmed VC Control's lab install. Voice Rooms is staged at the final exact seven-permission consent. Public application identifiers are retained only in an ignored local runtime file. Credential display, privileged-intent changes, and permission grants remain protected action-time steps.
 
 On Windows, run `pnpm secrets:local` before revealing either protected credential. The script first creates an ignored `.runtime/secrets` directory with access restricted to the current Windows account, then prompts without echo and writes the Voice Rooms bot token and VC Control client secret to `.runtime/secrets/discord.env`. It prints only the local path. Run a trusted repository command with `pnpm with:local-discord-secrets -- <command>` when those two environment variables are required. The wrapper does not print their values.
 
@@ -148,7 +152,34 @@ pnpm deploy:voice-host
 
 The Worker has `workers_dev=false`, no route, a one-minute reconciliation schedule, and one named Container per deployment. Its two-minute `sleepAfter` is renewed by scheduled reconciliation while hosting is enabled. Confirm Container health and a server-received AgentSession heartbeat younger than 45 seconds before issuing a voice command.
 
-## 7. Conventional-host fallback
+## 7. Optional authorized local RPC adapter
+
+This adapter runs only on Windows beside the authenticated Discord desktop client. It is not deployed to Cloudflare Containers and does not use a Discord user token. Before setup, Discord must grant RPC partner access or put the selected user on the application's tester list. Register the configured redirect URI in the application.
+
+Set the non-secret application ID, redirect URI, one allowed target guild ID, and profile name in the local process. Supply the application client secret through the existing protected local wrapper or another user-only secret manager. The first profile may be named `main`:
+
+```text
+set USER_RPC_PROFILE=main
+set USER_RPC_DISCORD_APPLICATION_ID=<approved application snowflake>
+set USER_RPC_DISCORD_REDIRECT_URI=<registered redirect URI>
+set USER_RPC_ALLOWED_GUILD_ID=<staff-approved guild snowflake>
+pnpm with:local-discord-secrets -- pnpm user-rpc:authorize
+```
+
+Discord opens its own RPC authorization dialog. Review and approve it manually. The script exchanges the returned OAuth code, authenticates the current desktop user, and writes a user-only ignored profile. It never requests or stores a raw Discord user token. Existing profile files are not overwritten during authorization.
+
+Start the agent only after setting the normal deployment, tenant, WebSocket, and agent-key environment values:
+
+```text
+set USER_RPC_PROFILE=main
+pnpm with:user-rpc-profile -- pnpm --filter @discord-vc-control/user-rpc-agent start
+```
+
+The wrapper refreshes the OAuth token when needed and injects the profile into only that child process. Startup fails if the desktop user differs from the profile's recorded user ID or if the authorized target differs from its one allowed guild. To migrate to a separate Discord account later, sign the Discord desktop client into that account and repeat authorization with a new profile name such as `presence`; do not overwrite or rename the original profile.
+
+RPC `join`, `leave`, `status`, `diagnostics`, `pause`, `resume`, and `reconnect` operate on the exact stored target. The adapter never force-moves a user out of another voice channel. `relay` selects the exact authorized text channel and stages the sanitized text on the local clipboard, returning `USER_SEND_REQUIRED`; the user performs the final paste/send. Discord RPC provides no supported guild send-message or microphone-injection command.
+
+## 8. Conventional-host fallback
 
 Create a root-owned mode-0600 environment file outside the repository, provide secrets through the host's secret manager, and retain the same exact `MANAGED_GUILD_IDS` and `CONTROL_AGENT_WS_URL` values. Set `VOICE_AGENT_ENV_FILE` to that absolute path. The ignored `deploy/voice-agent.env` path is available only as a local fallback and is excluded from both Git and Docker build contexts. Build and run:
 
@@ -159,6 +190,6 @@ docker compose -f deploy/docker-compose.yml up -d --build voice-agent
 
 For systemd, install the repository under `/opt/discord-voice-control-plane`, install `deploy/discord-voice-agent.service`, prebuild the image, and enable the service. The agent still authenticates to the same Cloudflare control Worker. The fallback does not expand its Discord permissions or target authorization.
 
-## 8. Test and target rollout
+## 9. Test and target rollout
 
-Complete every row in `TEST_EVIDENCE.md` in `VC Control Lab`, including restart, clean SIGTERM, moderator removal, ACL preservation, and relay redelivery. Only then request Socialize staff authorization using the supplied forms. Keep target results `UNVERIFIED` until observed during the approved window.
+Complete every official-bot row in `TEST_EVIDENCE.md` in `VC Control Lab`, including restart, clean SIGTERM, moderator removal, ACL preservation, and relay redelivery. Separately prove RPC approval, profile binding, exact voice selection, unexpected-disconnect blocking, desktop restart behavior, and the manual-send draft receipt before Socialize. Keep target results `UNVERIFIED` until observed during the approved window.

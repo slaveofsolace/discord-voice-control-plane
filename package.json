@@ -23,6 +23,9 @@
     "security:dependencies": "pnpm audit --audit-level high",
     "commands:control": "tsx scripts/register-control-commands.ts",
     "commands:voice": "tsx scripts/register-voice-commands.ts",
+    "install:url:voice": "tsx scripts/generate-voice-install-url.ts",
+    "user-rpc:authorize": "tsx scripts/authorize-user-rpc.ts",
+    "with:user-rpc-profile": "tsx scripts/with-user-rpc-profile.ts",
     "secrets:local": "tsx scripts/store-local-discord-secrets.ts",
     "with:local-discord-secrets": "tsx scripts/with-local-discord-secrets.ts",
     "secrets:control": "tsx scripts/configure-cloudflare-secrets.ts control",
@@ -32,6 +35,7 @@
     "rollback": "tsx scripts/rollback.ts"
   },
   "devDependencies": {
+    "@discord-vc-control/contracts": "workspace:*",
     "@cloudflare/vitest-plugin": "1.0.0",
     "@cloudflare/workers-types": "5.20260822.1",
     "@eslint/js": "10.0.1",
@@ -43,6 +47,7 @@
     "typescript": "6.0.3",
     "typescript-eslint": "8.67.0",
     "vitest": "4.1.11",
+    "zod": "4.4.3",
     "wrangler": "4.125.0"
   }
 }

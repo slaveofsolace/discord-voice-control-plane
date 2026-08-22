@@ -14,6 +14,9 @@ importers:
       '@cloudflare/workers-types':
         specifier: 5.20260822.1
         version: 5.20260822.1
+      '@discord-vc-control/contracts':
+        specifier: workspace:*
+        version: link:packages/contracts
       '@eslint/js':
         specifier: 10.0.1
         version: 10.0.1(eslint@10.9.0(supports-color@10.2.2))
@@ -44,6 +47,9 @@ importers:
       wrangler:
         specifier: 4.125.0
         version: 4.125.0(@cloudflare/workers-types@5.20260822.1)
+      zod:
+        specifier: 4.4.3
+        version: 4.4.3
 
   apps/control-worker:
     dependencies:
@@ -63,8 +69,33 @@ importers:
         specifier: 4.4.3
         version: 4.4.3
 
+  apps/user-rpc-agent:
+    dependencies:
+      '@discord-vc-control/agent-client':
+        specifier: workspace:*
+        version: link:../../packages/agent-client
+      '@discord-vc-control/config':
+        specifier: workspace:*
+        version: link:../../packages/config
+      '@discord-vc-control/contracts':
+        specifier: workspace:*
+        version: link:../../packages/contracts
+      '@discord-vc-control/security':
+        specifier: workspace:*
+        version: link:../../packages/security
+      zod:
+        specifier: 4.4.3
+        version: 4.4.3
+    devDependencies:
+      '@discord-vc-control/testing':
+        specifier: workspace:*
+        version: link:../../packages/testing
+
   apps/voice-agent:
     dependencies:
+      '@discord-vc-control/agent-client':
+        specifier: workspace:*
+        version: link:../../packages/agent-client
       '@discord-vc-control/config':
         specifier: workspace:*
         version: link:../../packages/config
@@ -102,6 +133,22 @@ importers:
       '@discord-vc-control/config':
         specifier: workspace:*
         version: link:../../packages/config
+
+  packages/agent-client:
+    dependencies:
+      '@discord-vc-control/contracts':
+        specifier: workspace:*
+        version: link:../contracts
+      '@discord-vc-control/security':
+        specifier: workspace:*
+        version: link:../security
+      ws:
+        specifier: 8.21.3
+        version: 8.21.3
+    devDependencies:
+      '@types/ws':
+        specifier: 8.18.1
+        version: 8.18.1
 
   packages/config:
     dependencies:
