@@ -1,0 +1,19 @@
+{
+  "name": "@discord-vc-control/control-worker",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "clean": "node ../../scripts/clean-dist.mjs apps/control-worker",
+    "dev": "wrangler dev --config wrangler.jsonc",
+    "deploy": "wrangler deploy --config wrangler.jsonc"
+  },
+  "dependencies": {
+    "@discord-vc-control/contracts": "workspace:*",
+    "@discord-vc-control/security": "workspace:*",
+    "discord-interactions": "4.4.0",
+    "zod": "4.4.3"
+  }
+}
