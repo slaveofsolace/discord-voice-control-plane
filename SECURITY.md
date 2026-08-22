@@ -16,3 +16,5 @@ If a credential may have leaked:
 6. Review Git history and GitHub secret-scanning alerts before restoring service.
 
 Never submit real credentials in a test fixture or reproduction.
+
+The conventional-host environment file belongs outside the repository and should be readable only by its service account. `deploy/voice-agent.env` is ignored as a local fallback and excluded from the deny-by-default Docker build context. The Cloudflare probe runs under the private voice-host Worker so the bot token is not copied into a second Worker secret boundary.

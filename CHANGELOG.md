@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+- Added durable Discord interaction claims, a pre-effect execution ledger, expiring/revalidated agent sessions, fail-closed audit capacity, and keyed state reconciliation with dead-letter blocking.
+- Added a 64 KiB interaction-body limit, complete runtime environment validation, rotation-key separation checks, and minimal Container health output.
+- Serialized managed-room creation and claims, rechecked every room command against current enablement, stopped on bot-owned ACL conflicts, and cancelled stale in-flight voice joins.
+- Moved the voice probe under the single token-bearing voice-host Worker and excluded fallback credentials from Git and the deny-by-default Docker build context.
+- Added regressions for interaction replay, execution restart safety, outbox capacity, heartbeat expiry, managed-room races and disablement, staff ACL conflicts, and intentional leave during connection setup.
+
 - Enforced the 30-second command lifetime in the shared envelope schema and reused the same constant in command production and test fixtures.
 
 - Corrected `/voice-admin authorize-target` so an exact configured target approver is not accidentally blocked by the unrelated managed-room permission gate; all administration subcommands remain runtime-authorized.

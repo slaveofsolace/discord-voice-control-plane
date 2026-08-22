@@ -6,18 +6,18 @@ The project uses two Discord applications: an interaction-only `VC Control` app 
 
 ## Current status
 
-The source passes its clean local verification and GitHub Actions gates: 81 package tests, 13 migration-backed Workers tests, strict type checking, all workspace builds, wording checks, secret scanning, dependency audit, Worker bundle dry-runs, and both Container image builds in CI.
+The current source passes strict type checking, 91 package tests, and 18 migration-backed Workers tests. The last published `main` revision passed its complete GitHub Actions gate; the remediated revision must pass the same gate before its evidence label changes from local to CI verified.
 
-Discord and Cloudflare runtime behavior is not yet verified. The private `VC Control Lab` server and its `voice-control` and `voice-probe` channels now exist, but neither application identity, credential path, permission grant, command path, nor voice connection has been exercised. The intended personal Cloudflare account is selected; Cloudflare voice hosting is **BLOCKED** until the owner authorizes and completes the Workers Paid upgrade. The Socialize path is **BLOCKED** until staff supplies an approval reference, approved window, approved application and guild IDs, and the exact temporary voice channel. [Test evidence](docs/TEST_EVIDENCE.md) keeps those live claims separate from local and CI results.
+Discord and Cloudflare runtime behavior is not yet verified. The private `VC Control Lab` server and its `voice-control` and `voice-probe` channels exist, but neither application identity, credential path, permission grant, command path, nor voice connection has been exercised. Workers Paid is active on the selected personal Cloudflare account, so billing no longer blocks Container deployment. The Socialize path is **BLOCKED** until staff supplies an approval reference, approved window, approved application and guild IDs, and the exact temporary voice channel. [Test evidence](docs/TEST_EVIDENCE.md) keeps those live claims separate from local and CI results.
 
 ## Services
 
 - `apps/control-worker`: Discord HTTP interactions, authorization, Durable Object sessions, and D1 audit/configuration.
 - `apps/voice-host-worker`: private Cloudflare Container lifecycle controller.
 - `apps/voice-agent`: Discord Gateway, voice connection, managed rooms, member commands, and safe relay.
-- `spikes/cloudflare-voice-probe`: isolated UDP, Gateway, DAVE, restart, and lifecycle proof.
+- `spikes/cloudflare-voice-probe`: isolated probe image and report contract for UDP, Gateway, DAVE, restart, and lifecycle proof.
 
-The control and voice planes share versioned contracts but not the Discord bot token. The control Worker cannot connect to Discord's Gateway. The private voice host is the only Cloudflare Worker designed to receive the Voice Rooms token.
+The control and voice planes share versioned contracts but not the Discord bot token. The control Worker cannot connect to Discord's Gateway. The private voice host is the only Cloudflare Worker designed to receive the Voice Rooms token; it starts both the production agent Container and the separately named probe Container.
 
 The public template starts with prefix commands and managed rooms disabled. Slash commands do not need Message Content. A deployment that enables `!voice` or `!v` must also enable Discord's Message Content privileged intent.
 

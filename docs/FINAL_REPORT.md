@@ -33,7 +33,7 @@ Cloudflare Container hosting is accepted only if the dedicated probe passes ever
 - Presence-only behavior for external temporary rooms; managed-room commands and ACL ownership do not cross that boundary.
 - Versioned HMAC envelopes, signed WebSocket challenge, replay cache, idempotency receipts, heartbeats, circuit breaker, and ordered recovery outboxes.
 - A DAVE-gated voice state machine with bounded retry, controlled rejoin, moderator-removal blocking, self-mute/self-deaf, and no audio receive or send path.
-- A private Container host, fail-closed Cloudflare voice probe, and conventional-host fallback.
+- A private Container host that controls separately named production and probe Containers under one bot-token boundary, plus a conventional-host fallback.
 
 ## 5. Security Controls
 
@@ -46,22 +46,22 @@ Cloudflare Container hosting is accepted only if the dedicated probe passes ever
 
 ## 6. Verification Evidence
 
-- `UNIT TESTED`: clean `pnpm verify` passed formatting, typed lint, strict typecheck, all eight workspace builds, and 81 package tests across 15 files.
-- `INTEGRATION TESTED`: 13 migration-backed Workers, Durable Object, D1, alarm, outbox, restart, authorization, and configuration tests passed.
-- `UNIT TESTED`: copy triage passed across 22 files; secret scanning passed across 115 candidate files; the high-severity dependency audit reported no known vulnerabilities.
-- `UNIT TESTED`: all three Worker bundles passed Wrangler dry-runs. The two Container-backed Workers were bundled locally with Container rollout disabled because Docker is unavailable on this machine.
-- `INTEGRATION TESTED`: GitHub Actions runs `32551597849` and `32551599391` passed the complete verification, both Docker image builds, scans, dependency audit, and control Worker dry-run at commit `180abd0594980d0dbcaeddfa5cab53914bb54016`.
-- `INTEGRATION TESTED`: main-branch run `32552515725` passed the same repository and image-construction gates at commit `0f52c5332f1dbdb17fd04438e4e918a94c26fad9`.
+- `UNIT TESTED`: clean `pnpm verify` passed formatting, typed lint, strict typecheck, all eight workspace builds, and 91 package tests across 15 files.
+- `INTEGRATION TESTED`: 18 migration-backed Workers, Durable Object, D1, interaction-replay, execution-ledger, heartbeat, outbox, restart, authorization, and configuration tests passed.
+- `UNIT TESTED`: copy triage passed across 22 files; secret scanning passed across 116 candidate files; the high-severity dependency audit reported no known vulnerabilities.
+- `INTEGRATION TESTED`: a standard source-only security review reported 14 findings against the prior revision. The current source remediates all 14 and passes focused regressions plus the complete clean gate; live Discord and Cloudflare behavior remains separately unverified.
+- `UNIT TESTED`: the current control and combined voice-host/probe bundles passed Wrangler dry-runs. Container rollout was disabled for the host dry-run because Docker is unavailable on this machine.
+- `INTEGRATION TESTED`: the last published main-branch workflow passed the complete repository and Docker image-construction gates. The remediated revision requires the same green result before final handoff.
 - `UNIT TESTED`: the canonical and installed `authorized-discord-bot-ops` skill copies validate and match byte-for-byte.
 - `UNVERIFIED`: the private test server and requested channels are observed, but no live Discord application, command, voice transport, Cloudflare Container, or target-guild behavior is counted by these results.
 
 ## 7. Deployment State
 
-The control Worker, D1 database, Durable Object, private voice host, and probe are not deployed. No live URL, production database ID, Container revision, probe report, or rollback exercise exists.
+Workers Paid is active on the selected test account. The control Worker, D1 database, Durable Object, private voice host, and probe are not deployed. No live URL, production database ID, Container revision, probe report, or rollback exercise exists.
 
-Cloudflare voice deployment is `BLOCKED`. Authorized UI opened Workers Paid checkout on the intended personal account. It shows $5 due today, then $5/month plus metered usage; both consent boxes and Activate remain untouched. The owner must authorize and complete the upgrade before deployment. Billing was not automated, and no account ID or billing detail is committed.
+Cloudflare voice deployment is `UNVERIFIED`, not billing-blocked. Authenticated account UI shows Workers Paid as the current plan and Containers included. No Worker, D1 database, Durable Object, or Container has been deployed, and no account ID or billing detail is committed.
 
-The private `VC Control Lab` server, `voice-control`, and `voice-probe` now exist and were observed in authenticated live UI. The `VC Control` creation form is ready with its developer terms box selected, but Create was not pressed. The two application identities and every command, Gateway, voice, intent, credential, and permission path remain `UNVERIFIED`. Login, MFA, CAPTCHA, credential display, token copying, security prompts, permission confirmation, and payment steps retain their protected boundaries.
+The private `VC Control Lab` server, `voice-control`, and `voice-probe` exist and were observed in authenticated live UI. The `VC Control` creation form is ready with its developer terms box selected, but Create was not pressed. The two application identities and every command, Gateway, voice, intent, credential, and permission path remain `UNVERIFIED`. Login, MFA, CAPTCHA, credential display, token copying, security prompts, and permission confirmations retain their protected boundaries. The owner completed the Cloudflare payment step; authenticated UI now shows Workers Paid as the current plan.
 
 ## 8. Target-Guild State
 
@@ -77,8 +77,7 @@ The conventional-host fallback uses the same voice-agent image and authenticated
 
 ## 10. Remaining Work
 
-1. The user authorizes and completes Workers Paid on the already selected personal Cloudflare account without sharing billing information or committing the account ID.
-2. After action-time approval, finish creating `VC Control` and `Voice Rooms`, handle protected credentials and permission confirmations, and complete the live private-guild command matrix in the existing `VC Control Lab` surface.
-3. Deploy the control plane, run two fail-closed Container probe cycles, capture clean SIGTERM and distinct-run evidence, then choose Cloudflare or the documented conventional host from the result.
-4. Socialize staff completes `SOCIALIZE_INTAKE.md`. During the approved window, test only official-bot presence controls and one ordinary relay, then observe deletion without synthetic activity.
-5. Exercise rollback and credential rotation in the private environment. Until those actions occur, the corresponding labels remain `UNVERIFIED` or `BLOCKED`.
+1. After action-time approval, finish creating `VC Control` and `Voice Rooms`, handle protected credentials and permission confirmations, and complete the live private-guild command matrix in the existing `VC Control Lab` surface.
+2. Deploy the control plane, run two fail-closed Container probe cycles, capture clean SIGTERM and distinct-run evidence, then choose Cloudflare or the documented conventional host from the result.
+3. Socialize staff completes `SOCIALIZE_INTAKE.md`. During the approved window, test only official-bot presence controls and one ordinary relay, then observe deletion without synthetic activity.
+4. Exercise rollback and credential rotation in the private environment. Until those actions occur, the corresponding labels remain `UNVERIFIED` or `BLOCKED`.

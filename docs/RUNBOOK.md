@@ -39,8 +39,9 @@ Moderator disconnect or move, permission loss, deleted target, invalid authoriza
 
 ## State recovery
 
-- Agent messages are serialized. Status, config, target, and room snapshots are coalesced in a bounded offline queue and replayed after authenticated bootstrap.
-- Durable Object D1 failures enter ordered audit or state outboxes. Alarms retry oldest-first. Investigate a growing queue before purging anything.
+- Agent messages are serialized. Status, config, target, and room snapshots are coalesced by object key and replayed after authenticated bootstrap.
+- A command moves into the Durable Object executing ledger before the agent performs its side effect. A missing start acknowledgement or final receipt fails closed; do not delete an executing record to force a retry without reviewing whether the effect already occurred.
+- Transient D1 failures enter audit or state reconciliation queues and alarms retry them. An audit queue at capacity rejects new control actions. A permanent state conflict enters `STATE_RECONCILIATION_BLOCKED` and prevents bootstrap until a newer valid snapshot for that key reconciles it. Investigate the cause before purging anything.
 - Agent-supplied timestamps are diagnostic only. Liveness uses the Worker's receipt time.
 - On process restart, managed-room reconciliation schedules any zero-human or bot-only room for the normal 15-second deletion grace.
 
@@ -50,7 +51,7 @@ Worker and Container image:
 
 1. List Worker versions and choose the known revision.
 2. Set `ROLLBACK_APPROVED=discord-voice-control-plane` and `ROLLBACK_VERSION_ID`.
-3. Run `pnpm rollback -- control` or the selected service argument.
+3. Run `pnpm rollback -- control` or `pnpm rollback -- voice-host`.
 4. Confirm that the restored Worker references an available Container image revision.
 5. Recheck host cron, named Container state, AgentSession heartbeat, and exact target before resuming.
 

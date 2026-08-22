@@ -88,15 +88,16 @@ Set `TARGET_APPROVER_USER_IDS` to the exact staff IDs allowed to run `authorize-
 
 ## 5. Cloudflare Container gate
 
-Current blocker: authorized UI selected the intended personal Cloudflare account and opened the Workers Paid checkout. It shows a $5 base charge due today, then $5 per month plus metered overages. Both billing-consent boxes and Activate remain untouched. The owner must authorize and complete that upgrade before deployment. Do not commit the account ID or billing data. No script in this repository performs a billing action.
+Workers Paid is active on the selected personal Cloudflare account. The account ID and billing data stay outside the repository. No script in this repository performs a billing action.
 
-After that approval:
+The probe is a separately named Container controlled by the private voice-host Worker. It does not have a public route, a separate Worker secret, or a second copy of the bot token.
+The host schema rejects production and probe mode when both are enabled; run the probe with `HOST_ENABLED=false`, then disable the probe before enabling the production agent.
 
-1. Set the probe bot token with `pnpm secrets:probe`.
-2. Export the exact private test guild and voice channel IDs.
-3. Set `DEPLOY_APPROVED=discord-voice-control-plane` and run `pnpm deploy:probe`.
-4. Follow sanitized `cloudflare_voice_probe_result`, `cloudflare_voice_probe_shutdown`, and `cloudflare_voice_probe_lifecycle` events.
-5. Let the one-minute cron call the named Container repeatedly. Container `sleepAfter` is five minutes and the controller renews activity during a run.
+1. Set the voice-host bot token and agent key with `pnpm secrets:voice-host`.
+2. Export the exact private test guild and voice channel IDs, set `HOST_ENABLED=false`, and set `PROBE_ENABLED=true`.
+3. Set `DEPLOY_APPROVED=discord-voice-control-plane` and run `pnpm deploy:voice-host`.
+4. Follow sanitized `cloudflare_voice_probe_result`, `cloudflare_voice_probe_shutdown`, `cloudflare_voice_probe_lifecycle`, and `voice_host_probe_cycle_complete` events.
+5. Let the one-minute voice-host cron call the named probe Container. Container `sleepAfter` is five minutes and the controller renews activity during a run.
 6. Require a complete first report, first clean SIGTERM record, a different second run ID and complete second report, second clean SIGTERM record, then `LIFECYCLE_RESTART_VERIFIED`.
 
 Each complete report must prove:
@@ -116,7 +117,7 @@ Any missing field fails the gate. Do not deploy the voice host on Cloudflare aft
 
 ## 6. Deploy the private voice host
 
-`CONTROL_AGENT_WS_URL` is a non-secret `wss://` deployment variable. Set the bot token and current agent key through protected prompts:
+`CONTROL_AGENT_WS_URL` is a non-secret `wss://` deployment variable. If step 5 did not already set them, set the bot token and current agent key through protected prompts:
 
 ```sh
 pnpm secrets:voice-host
@@ -128,7 +129,7 @@ During rotation only:
 pnpm secrets:voice-host -- --include-previous
 ```
 
-Export `CONTROL_AGENT_WS_URL`, `HOST_ENABLED=true`, the tenant/deployment IDs, feature flags, `MANAGED_GUILD_IDS`, and the current key ID. Set a previous key ID only with its matching secret. Then run:
+Export `CONTROL_AGENT_WS_URL`, `HOST_ENABLED=true`, `PROBE_ENABLED=false`, the tenant/deployment IDs, feature flags, `MANAGED_GUILD_IDS`, and the current key ID. Set a previous key ID only with its matching secret. Then run:
 
 ```sh
 set DEPLOY_APPROVED=discord-voice-control-plane
@@ -139,9 +140,10 @@ The Worker has `workers_dev=false`, no route, a one-minute reconciliation schedu
 
 ## 7. Conventional-host fallback
 
-Copy `deploy/voice-agent.env.example` to ignored `deploy/voice-agent.env`, provide secrets through the host's secret manager, and retain the same exact `MANAGED_GUILD_IDS` and `CONTROL_AGENT_WS_URL` values. Build and run:
+Create a root-owned mode-0600 environment file outside the repository, provide secrets through the host's secret manager, and retain the same exact `MANAGED_GUILD_IDS` and `CONTROL_AGENT_WS_URL` values. Set `VOICE_AGENT_ENV_FILE` to that absolute path. The ignored `deploy/voice-agent.env` path is available only as a local fallback and is excluded from both Git and Docker build contexts. Build and run:
 
 ```sh
+export VOICE_AGENT_ENV_FILE=/etc/discord-voice-control-plane/voice-agent.env
 docker compose -f deploy/docker-compose.yml up -d --build voice-agent
 ```
 

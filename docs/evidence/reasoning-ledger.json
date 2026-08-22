@@ -3,7 +3,7 @@
   "ledger_id": "discord_voice_control",
   "created_at": "2026-08-21T23:00:00-05:00",
   "depth": "DEEP",
-  "iteration": 7,
+  "iteration": 8,
   "root": {
     "kind": "DECISION",
     "node_id": "root_node",
@@ -52,7 +52,7 @@
         "unknown_disposition": "Container UDP, DAVE, and lifecycle behavior require live proof."
       },
       "current_state_history": {
-        "summary": "The hardened implementation preserves the exact target-approver allowlist and enforces a 30-second command lifetime; the private VC Control Lab server and requested channels exist; both Discord applications and every live runtime gate remain open; SOL Tools remained dirty and protected.",
+        "summary": "The hardened implementation adds durable interaction and execution replay controls, fail-closed reconciliation, managed-room race and ACL guards, and a single Worker token boundary; the private VC Control Lab server and requested channels exist; Workers Paid is active; both Discord applications and every live runtime gate remain open; SOL Tools remained dirty and protected.",
         "knowledge": "KNOWN",
         "load_bearing": true,
         "claim_ids": [
@@ -61,7 +61,7 @@
           "claim_command_lifetime",
           "claim_unknown"
         ],
-        "unknown_disposition": "Recheck branch, HEAD, credentials, account plan, and live app state before external actions."
+        "unknown_disposition": "Recheck branch, HEAD, credentials, and live app state before external actions."
       },
       "people_incentives": {
         "summary": "The user owns the repository and deployment; Discord guild staff own installation and retention approval; guild members are affected non-users.",
@@ -96,7 +96,7 @@
     "stakeholders": []
   },
   "authority": {
-    "scope": "Build, test, publish to main, and deploy the requested official-bot system; live credentials, billing, and target permissions remain human-reserved.",
+    "scope": "Build, test, publish to main, and deploy the requested official-bot system; live credentials and target permissions remain human-reserved. The owner completed Workers Paid enrollment.",
     "decision_owner": "Repository owner for implementation; target-guild staff for Socialize actions",
     "authorized_actions": [
       "Create and modify the isolated repository.",
@@ -111,7 +111,7 @@
       "Delete a branch that has not been proved redundant with main or is unrelated to this task."
     ],
     "human_reserved_decisions": [
-      "Cloudflare Workers Paid enrollment, Discord credential creation or revelation, permission confirmation, and Socialize installation approval."
+      "Discord credential creation or revelation, permission confirmation, and Socialize installation approval."
     ],
     "external_state_allowed": true,
     "hard_gates": [
@@ -140,21 +140,21 @@
         "id": "gate_external",
         "category": "IRREVERSIBLE_EXTERNAL_STATE",
         "status": "CLEAR",
-        "rationale": "GitHub publication on main and Cloudflare deployment are authorized; billing, credentials, target permissions, and unrelated branch deletion remain gated.",
+        "rationale": "GitHub publication on main and Cloudflare deployment are authorized; credentials, target permissions, and unrelated branch deletion remain gated. Workers Paid enrollment is complete.",
         "claim_ids": ["claim_unknown"]
       },
       {
         "id": "gate_production",
         "category": "DESTRUCTIVE_PRODUCTION",
         "status": "CLEAR",
-        "rationale": "Deployment is in scope only after private evidence and the paid-plan and credential handoffs; destructive cleanup is not authorized.",
+        "rationale": "Deployment is in scope after private evidence and the remaining credential handoffs; the paid-plan gate is complete and destructive cleanup is not authorized.",
         "claim_ids": ["claim_unknown"]
       },
       {
         "id": "gate_human",
         "category": "HUMAN_RESERVED",
         "status": "CLEAR",
-        "rationale": "Billing, credential exposure, permissions, Socialize approval, and subjective acceptance have named human owners.",
+        "rationale": "Credential exposure, permissions, Socialize approval, and subjective acceptance have named human owners. The billing decision was completed by the owner.",
         "claim_ids": ["claim_unknown"]
       },
       {
@@ -221,8 +221,8 @@
     {
       "id": "claim_live_setup",
       "label": "OBSERVED",
-      "statement": "Authenticated live UI created VC Control Lab with voice-control and voice-probe and selected the intended personal Cloudflare account; no Discord application identity, credential, grant, paid subscription, or deployment was created.",
-      "evidence_ids": ["ev_live_setup", "ev_cloudflare_blocker"],
+      "statement": "Authenticated live UI shows VC Control Lab with voice-control and voice-probe and Workers Paid as the current Cloudflare plan; no Discord application identity, credential, permission grant, or deployment was created.",
+      "evidence_ids": ["ev_live_setup", "ev_cloudflare_paid"],
       "contradiction_claim_ids": [],
       "confidence": {
         "level": "HIGH",
@@ -237,7 +237,7 @@
       "contradiction_claim_ids": [],
       "confidence": {
         "level": "HIGH",
-        "basis": "Focused authorization tests and the complete 81-test package suite exercise the gate mapping and exact allowlist path."
+        "basis": "Focused authorization tests and the complete 91-test package suite exercise the gate mapping and exact allowlist path."
       }
     },
     {
@@ -248,14 +248,14 @@
       "contradiction_claim_ids": [],
       "confidence": {
         "level": "HIGH",
-        "basis": "The focused boundary test rejects a 30,001-millisecond lifetime and the complete 81-test package suite passes with the shared constant used by production and fixture code."
+        "basis": "The focused boundary test rejects a 30,001-millisecond lifetime and the complete 91-test package suite passes with the shared constant used by production and fixture code."
       }
     },
     {
       "id": "claim_unknown",
       "label": "UNKNOWN",
-      "statement": "Workers Paid enrollment, both Discord application identities and protected grants, private-guild behavior, Container UDP and DAVE lifecycle behavior, rollback, and Socialize retention remain unresolved.",
-      "evidence_ids": ["ev_cloudflare_blocker", "ev_live_setup", "ev_runtime_prerequisites"],
+      "statement": "Both Discord application identities and protected grants, private-guild behavior, Container UDP and DAVE lifecycle behavior, rollback, and Socialize retention remain unresolved.",
+      "evidence_ids": ["ev_live_setup", "ev_runtime_prerequisites"],
       "contradiction_claim_ids": [],
       "confidence": {
         "level": "LOW",
@@ -279,8 +279,8 @@
       "kind": "TEST_RESULT",
       "access": "GENERATED_CURRENT",
       "locator": "docs/TEST_EVIDENCE.md",
-      "captured_at": "2026-08-22T01:44:00-05:00",
-      "integrity": "Sanitized summary of frozen install, formatting, lint, typecheck, builds, 81 package tests, 13 Workers tests, wording, secret, dependency, skill, and deploy-bundle checks.",
+      "captured_at": "2026-08-22T03:11:00-05:00",
+      "integrity": "Sanitized summary of frozen install, formatting, lint, typecheck, eight builds, 91 package tests, 18 Workers tests, wording, 116-file secret scan, dependency audit, skill parity, and current control/combined-host deploy-bundle checks.",
       "supports_claim_ids": ["claim_objective"],
       "contradicts_claim_ids": []
     },
@@ -305,13 +305,13 @@
       "contradicts_claim_ids": []
     },
     {
-      "id": "ev_cloudflare_blocker",
-      "kind": "LOG",
+      "id": "ev_cloudflare_paid",
+      "kind": "MEASUREMENT",
       "access": "INSPECTED_CURRENT",
-      "locator": "docs/RESEARCH.md#unresolved-live-facts",
-      "captured_at": "2026-08-22T01:33:11-05:00",
-      "integrity": "Sanitized current UI and prior Wrangler evidence: Workers Paid checkout is open at $5 due today, then $5/month plus usage; both consent boxes and Activate remain untouched; account identifiers, billing data, and raw logs are excluded.",
-      "supports_claim_ids": ["claim_live_setup", "claim_unknown"],
+      "locator": "docs/TEST_EVIDENCE.md#current-checkpoint",
+      "captured_at": "2026-08-22T02:24:00-05:00",
+      "integrity": "Sanitized authenticated account observation: Workers Paid is the current plan and Containers are included; account identifiers, billing data, and raw UI output are excluded.",
+      "supports_claim_ids": ["claim_live_setup"],
       "contradicts_claim_ids": []
     },
     {
@@ -340,7 +340,7 @@
       "access": "GENERATED_CURRENT",
       "locator": "docs/COMPLETION_AUDIT.md#external-live-gates",
       "captured_at": "2026-08-22T01:33:11-05:00",
-      "integrity": "Sanitized gate state: neither Discord application exists, Workers Paid checkout is open but not activated, and no credential or account identifier is recorded.",
+      "integrity": "Sanitized gate state: neither Discord application exists, Workers Paid is active, and no credential or account identifier is recorded.",
       "supports_claim_ids": ["claim_unknown"],
       "contradicts_claim_ids": []
     }
@@ -474,7 +474,7 @@
   },
   "decision": {
     "iteration_choice": "ESCALATE",
-    "recommendation": "Preserve the completed private test surface and wait for action-time approval to create the two Discord application identities and enroll in Workers Paid; continue live proof only after the protected credential and permission steps.",
+    "recommendation": "Preserve the completed private test surface, complete the protected Discord application identity and credential steps, then deploy the control plane and private probe before enabling the production voice host.",
     "selected_action_ids": [],
     "rejected_options": [
       "Do not begin with Socialize or a production voice connection before private-guild and hosting proof."
