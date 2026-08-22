@@ -1,0 +1,47 @@
+{
+  "name": "discord-voice-control-plane",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@11.19.0",
+  "engines": {
+    "node": ">=24.0.0 <25"
+  },
+  "scripts": {
+    "build": "pnpm -r --workspace-concurrency=1 run build",
+    "clean": "pnpm -r run clean",
+    "format:check": "prettier --check .",
+    "format": "prettier --write .",
+    "lint": "eslint .",
+    "lint:copy": "python scripts/scan_copy.py README.md docs skills",
+    "typecheck": "tsc -p tsconfig.json --noEmit && pnpm -r --workspace-concurrency=1 run typecheck",
+    "test": "vitest run --config vitest.config.ts",
+    "test:worker": "vitest run --config apps/control-worker/vitest.config.ts",
+    "verify": "pnpm format:check && pnpm lint && pnpm typecheck && pnpm build && pnpm test && pnpm test:worker && pnpm lint:copy",
+    "security:secrets": "python scripts/scan_secrets.py",
+    "security:dependencies": "pnpm audit --audit-level high",
+    "commands:control": "tsx scripts/register-control-commands.ts",
+    "commands:voice": "tsx scripts/register-voice-commands.ts",
+    "secrets:control": "tsx scripts/configure-cloudflare-secrets.ts control",
+    "secrets:voice-host": "tsx scripts/configure-cloudflare-secrets.ts voice-host",
+    "secrets:probe": "tsx scripts/configure-cloudflare-secrets.ts probe",
+    "deploy:control": "tsx scripts/deploy.ts control",
+    "deploy:voice-host": "tsx scripts/deploy.ts voice-host",
+    "deploy:probe": "tsx scripts/deploy.ts probe",
+    "rollback": "tsx scripts/rollback.ts"
+  },
+  "devDependencies": {
+    "@cloudflare/vitest-plugin": "1.0.0",
+    "@cloudflare/workers-types": "5.20260822.1",
+    "@eslint/js": "10.0.1",
+    "@types/node": "24.13.3",
+    "eslint": "10.9.0",
+    "eslint-plugin-security": "4.0.1",
+    "prettier": "3.9.6",
+    "tsx": "4.23.12",
+    "typescript": "6.0.3",
+    "typescript-eslint": "8.67.0",
+    "vitest": "4.1.11",
+    "wrangler": "4.125.0"
+  }
+}

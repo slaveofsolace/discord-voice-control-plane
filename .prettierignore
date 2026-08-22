@@ -1,0 +1,7 @@
+node_modules
+dist
+coverage
+.wrangler
+.runtime
+pnpm-lock.yaml
+LICENSE
