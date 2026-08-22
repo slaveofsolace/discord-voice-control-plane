@@ -28,6 +28,11 @@ function variable(name: string, fallback?: string): string {
   return `${name}:${value}`;
 }
 
+function optionalVariable(name: string): string[] {
+  const value = process.env[name]?.trim();
+  return value ? ["--var", `${name}:${value}`] : [];
+}
+
 if (service === "control") {
   const config = "apps/control-worker/wrangler.jsonc";
   const vars = [
@@ -43,8 +48,17 @@ if (service === "control") {
     variable("CONTROL_ELEVATED_ROLE_IDS", ""),
     variable("AGENT_KEY_ID")
   ].flatMap((value) => ["--var", value]);
-  await run(["deploy", "--config", config, ...vars]);
-  await run(["d1", "migrations", "apply", "DB", "--remote", "--config", config]);
+  vars.push(...optionalVariable("AGENT_PREVIOUS_KEY_ID"));
+  const deploy = () => run(["deploy", "--config", config, ...vars]);
+  const migrate = () => run(["d1", "migrations", "apply", "DB", "--remote", "--config", config]);
+  if (process.env.INITIAL_D1_PROVISION === "true") {
+    await deploy();
+    await migrate();
+    await deploy();
+  } else {
+    await migrate();
+    await deploy();
+  }
 } else if (service === "voice-host") {
   const vars = [
     variable("DEPLOYMENT_ID"),
@@ -53,9 +67,12 @@ if (service === "control") {
     variable("PREFIX_COMMANDS_ENABLED", "false"),
     variable("MESSAGE_CONTENT_INTENT_ENABLED", "false"),
     variable("MANAGED_ROOMS_ENABLED", "false"),
+    variable("MANAGED_GUILD_IDS", ""),
     variable("TARGET_APPROVER_USER_IDS", ""),
-    variable("AGENT_KEY_ID")
+    variable("AGENT_KEY_ID"),
+    variable("CONTROL_AGENT_WS_URL")
   ].flatMap((value) => ["--var", value]);
+  vars.push(...optionalVariable("AGENT_PREVIOUS_KEY_ID"));
   await run(["deploy", "--config", "apps/voice-host-worker/wrangler.jsonc", ...vars]);
 } else {
   const vars = [

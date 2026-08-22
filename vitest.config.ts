@@ -5,7 +5,8 @@ export default defineConfig({
     include: [
       "packages/**/*.test.ts",
       "apps/control-worker/src/**/*.test.ts",
-      "apps/voice-agent/**/*.test.ts"
+      "apps/voice-agent/**/*.test.ts",
+      "spikes/**/*.test.ts"
     ],
     coverage: {
       enabled: false

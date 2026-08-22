@@ -1,31 +1,35 @@
 import { spawn } from "node:child_process";
 
 const service = process.argv[2];
-const configurations: Record<string, { config: string; secrets: string[] }> = {
+const includePrevious = process.argv.includes("--include-previous");
+const configurations: Record<
+  string,
+  { config: string; optionalSecrets?: string[]; requiredSecrets: string[] }
+> = {
   control: {
     config: "apps/control-worker/wrangler.jsonc",
-    secrets: ["AGENT_AUTH_SECRET", "AGENT_PREVIOUS_AUTH_SECRET", "INTERNAL_STATUS_SECRET"]
+    requiredSecrets: ["AGENT_AUTH_SECRET", "INTERNAL_STATUS_SECRET"],
+    optionalSecrets: ["AGENT_PREVIOUS_AUTH_SECRET"]
   },
   "voice-host": {
     config: "apps/voice-host-worker/wrangler.jsonc",
-    secrets: [
-      "DISCORD_BOT_TOKEN",
-      "CONTROL_AGENT_WS_URL",
-      "AGENT_AUTH_SECRET",
-      "AGENT_PREVIOUS_AUTH_SECRET",
-      "AGENT_PREVIOUS_KEY_ID"
-    ]
+    requiredSecrets: ["DISCORD_BOT_TOKEN", "AGENT_AUTH_SECRET"],
+    optionalSecrets: ["AGENT_PREVIOUS_AUTH_SECRET"]
   },
   probe: {
     config: "spikes/cloudflare-voice-probe/wrangler.jsonc",
-    secrets: ["DISCORD_BOT_TOKEN"]
+    requiredSecrets: ["DISCORD_BOT_TOKEN"]
   }
 };
 const selected = service === undefined ? undefined : configurations[service];
 if (selected === undefined) throw new Error("USAGE_SECRETS_CONTROL_VOICE_HOST_OR_PROBE");
 
 const pnpm = process.platform === "win32" ? "pnpm.cmd" : "pnpm";
-for (const secret of selected.secrets) {
+const secrets = [
+  ...selected.requiredSecrets,
+  ...(includePrevious ? (selected.optionalSecrets ?? []) : [])
+];
+for (const secret of secrets) {
   await new Promise<void>((resolve, reject) => {
     console.log(`Protected prompt for ${secret}`);
     const child = spawn(
