@@ -12,8 +12,14 @@ if (
   throw new Error("Expected a repository-relative workspace path");
 }
 const repositoryRoot = resolve(import.meta.dirname, "..");
-const target = resolve(repositoryRoot, relative, "dist");
-if (!target.startsWith(`${repositoryRoot}\\`) && !target.startsWith(`${repositoryRoot}/`)) {
+const workspaceRoot = resolve(repositoryRoot, relative);
+if (
+  !workspaceRoot.startsWith(`${repositoryRoot}\\`) &&
+  !workspaceRoot.startsWith(`${repositoryRoot}/`)
+) {
   throw new Error("Refusing to clean outside the repository");
 }
-await rm(target, { recursive: true, force: true });
+await Promise.all([
+  rm(resolve(workspaceRoot, "dist"), { recursive: true, force: true }),
+  rm(resolve(workspaceRoot, "tsconfig.tsbuildinfo"), { force: true })
+]);
