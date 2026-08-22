@@ -44,6 +44,10 @@ function parseSubcommand(interaction: DiscordInteraction): {
 
 function summarizeStatus(status: SessionStatus): string {
   const observed = status.status;
+  const heartbeat = status.lastHeartbeat;
+  const heartbeatAge =
+    heartbeat === null ? "never" : `${Math.max(0, Date.now() - heartbeat)} ms ago`;
+  const agentHealth = observed?.last_health_at;
   return [
     `Agent: ${status.agentConnected ? (status.heartbeatStale ? "connected but stale" : "connected") : "disconnected"}`,
     `Desired: ${observed?.desired_connected ? "connected" : "disconnected"}`,
@@ -54,6 +58,8 @@ function summarizeStatus(status: SessionStatus): string {
     `Circuit: ${observed?.circuit_open ? "open" : "closed"}`,
     `Retries: ${observed?.retry_count ?? 0}`,
     `Pending: ${status.pendingCommands}`,
+    `Heartbeat received: ${heartbeat === null ? "never" : new Date(heartbeat).toISOString()} (${heartbeatAge})`,
+    `Agent-reported health: ${agentHealth === undefined ? "never" : new Date(agentHealth).toISOString()}`,
     `Last error: ${observed?.last_error_code ?? status.lastError ?? "none"}`
   ].join("\n");
 }
@@ -186,7 +192,7 @@ async function handleInteraction(
   }
   const authorization = authorizeInteraction(interaction, parsed.action, env);
   if (!authorization.allowed) return interactionResponse(`Denied: ${authorization.code}.`);
-  if (parsed.action === "status" || parsed.action === "diagnostics") {
+  if (parsed.action === "status") {
     try {
       return interactionResponse(summarizeStatus(await getSessionStatus(env)));
     } catch {

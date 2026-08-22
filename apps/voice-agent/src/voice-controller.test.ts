@@ -63,7 +63,7 @@ function command(
   };
 }
 
-function connectionFixture(): {
+function connectionFixture(daveEstablished = true): {
   connection: VoiceConnection;
   destroy: ReturnType<typeof vi.fn>;
   emitter: EventEmitter;
@@ -76,7 +76,7 @@ function connectionFixture(): {
     voicePrivacyCode: string | undefined;
   };
   mutable.state = { status: VoiceConnectionStatus.Ready };
-  mutable.voicePrivacyCode = "privacy-code";
+  mutable.voicePrivacyCode = daveEstablished ? "privacy-code" : undefined;
   mutable.ping = { udp: 8, ws: 5 };
   const destroy = vi.fn(() => {
     mutable.state = { status: VoiceConnectionStatus.Destroyed };
@@ -85,8 +85,8 @@ function connectionFixture(): {
   return { connection: mutable as unknown as VoiceConnection, destroy, emitter };
 }
 
-function fixture(permissionAllowed = true) {
-  const voiceConnection = connectionFixture();
+function fixture(permissionAllowed = true, daveEstablished = true) {
+  const voiceConnection = connectionFixture(daveEstablished);
   voiceMocks.joinVoiceChannel.mockReturnValue(voiceConnection.connection);
   voiceMocks.entersState.mockResolvedValue(voiceConnection.connection);
   const send = vi.fn().mockResolvedValue({ id: "100000000000000099" });
@@ -148,6 +148,15 @@ describe("voice controller", () => {
     });
   });
 
+  it("returns live, redacted diagnostics from the voice process", async () => {
+    const { controller } = fixture();
+    await controller.execute(command("join"));
+    await expect(controller.execute(command("diagnostics"))).resolves.toMatchObject({
+      accepted: true,
+      summary: expect.stringContaining("ws_ping_ms=5")
+    });
+  });
+
   it("relays normalized plain text with mention suppression and operator limits", async () => {
     const { controller, send } = fixture();
     await controller.execute(command("join"));
@@ -155,7 +164,9 @@ describe("voice controller", () => {
     expect(first).toMatchObject({ accepted: true, target_message_id: "100000000000000099" });
     expect(send).toHaveBeenCalledWith({
       content: "café",
-      allowedMentions: { parse: [] }
+      allowedMentions: { parse: [] },
+      nonce: first.command_id?.replaceAll("-", "").slice(0, 25),
+      enforceNonce: true
     });
     for (let index = 0; index < 4; index += 1) {
       expect(
@@ -168,6 +179,15 @@ describe("voice controller", () => {
       accepted: false,
       result_code: "OPERATOR_RELAY_RATE_LIMIT"
     });
+  });
+
+  it("does not report connected until DAVE negotiation is observed", async () => {
+    const { controller, voiceConnection } = fixture(true, false);
+    const pending = controller.execute(command("join"));
+    await vi.waitFor(() => expect(controller.status.observed_state).toBe("DEGRADED"));
+    voiceConnection.emitter.emit("transitioned");
+    await expect(pending).resolves.toMatchObject({ accepted: true, observed_state: "CONNECTED" });
+    expect(controller.status.dave_established).toBe(true);
   });
 
   it("enforces the deployment-wide relay limit across distinct operators", async () => {
@@ -241,6 +261,48 @@ describe("voice controller", () => {
     expect(controlAuth.controller.status).toMatchObject({
       observed_state: "BLOCKED",
       last_error_code: "AGENT_AUTH_REJECTED"
+    });
+  });
+
+  it("blocks a join when no exact target is authorized", async () => {
+    const { controller } = fixture();
+    controller.setTarget(null);
+    await expect(controller.execute(command("join"))).resolves.toMatchObject({
+      accepted: false,
+      result_code: "AUTHORIZED_TARGET_NOT_SET",
+      observed_state: "BLOCKED"
+    });
+  });
+
+  it("distinguishes operator disconnects from later moderator removal", async () => {
+    const paused = fixture();
+    await paused.controller.execute(command("join"));
+    await paused.controller.execute(command("pause"));
+    paused.controller.handleOwnVoiceState(
+      { channelId: target.voice_channel_id } as VoiceState,
+      { channelId: null } as VoiceState
+    );
+    expect(paused.controller.status.observed_state).toBe("PAUSED");
+
+    const reconnected = fixture();
+    const replacement = connectionFixture();
+    voiceMocks.joinVoiceChannel
+      .mockReturnValueOnce(reconnected.voiceConnection.connection)
+      .mockReturnValueOnce(replacement.connection);
+    await reconnected.controller.execute(command("join"));
+    const reconnect = reconnected.controller.execute(command("reconnect"));
+    reconnected.controller.handleOwnVoiceState(
+      { channelId: target.voice_channel_id } as VoiceState,
+      { channelId: null } as VoiceState
+    );
+    await expect(reconnect).resolves.toMatchObject({ accepted: true, observed_state: "CONNECTED" });
+    reconnected.controller.handleOwnVoiceState(
+      { channelId: target.voice_channel_id } as VoiceState,
+      { channelId: null } as VoiceState
+    );
+    expect(reconnected.controller.status).toMatchObject({
+      observed_state: "BLOCKED",
+      last_error_code: "MODERATOR_DISCONNECT"
     });
   });
 

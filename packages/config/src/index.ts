@@ -22,23 +22,36 @@ const csvSnowflakes = z
     return new Set(parsed.data);
   });
 
-export const controlEnvironmentSchema = z.object({
-  DEPLOYMENT_ID: z.string().min(1).max(64),
-  TENANT_ID: z.string().min(1).max(64),
-  CONTROL_DISCORD_APPLICATION_ID: snowflakeSchema,
-  CONTROL_DISCORD_PUBLIC_KEY: z.string().regex(/^[a-f\d]{64}$/iu),
-  CONTROL_GUILD_ID: snowflakeSchema,
-  CONTROL_CHANNEL_IDS: csvSnowflakes,
-  CONTROL_OPERATOR_USER_IDS: csvSnowflakes,
-  CONTROL_OPERATOR_ROLE_IDS: csvSnowflakes,
-  CONTROL_ELEVATED_USER_IDS: csvSnowflakes,
-  CONTROL_ELEVATED_ROLE_IDS: csvSnowflakes,
-  AGENT_AUTH_SECRET: z.string().min(32),
-  AGENT_PREVIOUS_AUTH_SECRET: z.string().min(32).optional(),
-  AGENT_KEY_ID: z.string().min(1).max(64),
-  AGENT_PREVIOUS_KEY_ID: z.string().min(1).max(64).optional(),
-  INTERNAL_STATUS_SECRET: z.string().min(32)
-});
+export const controlEnvironmentSchema = z
+  .object({
+    DEPLOYMENT_ID: z.string().min(1).max(64),
+    TENANT_ID: z.string().min(1).max(64),
+    CONTROL_DISCORD_APPLICATION_ID: snowflakeSchema,
+    CONTROL_DISCORD_PUBLIC_KEY: z.string().regex(/^[a-f\d]{64}$/iu),
+    CONTROL_GUILD_ID: snowflakeSchema,
+    CONTROL_CHANNEL_IDS: csvSnowflakes,
+    CONTROL_OPERATOR_USER_IDS: csvSnowflakes,
+    CONTROL_OPERATOR_ROLE_IDS: csvSnowflakes,
+    CONTROL_ELEVATED_USER_IDS: csvSnowflakes,
+    CONTROL_ELEVATED_ROLE_IDS: csvSnowflakes,
+    AGENT_AUTH_SECRET: z.string().min(32),
+    AGENT_PREVIOUS_AUTH_SECRET: z.string().min(32).optional(),
+    AGENT_KEY_ID: z.string().min(1).max(64),
+    AGENT_PREVIOUS_KEY_ID: z.string().min(1).max(64).optional(),
+    INTERNAL_STATUS_SECRET: z.string().min(32)
+  })
+  .superRefine((value, context) => {
+    if (
+      (value.AGENT_PREVIOUS_KEY_ID === undefined) !==
+      (value.AGENT_PREVIOUS_AUTH_SECRET === undefined)
+    ) {
+      context.addIssue({
+        code: "custom",
+        message: "Previous agent key ID and secret must be configured together",
+        path: ["AGENT_PREVIOUS_KEY_ID"]
+      });
+    }
+  });
 
 export const voiceEnvironmentSchema = z
   .object({
@@ -53,7 +66,8 @@ export const voiceEnvironmentSchema = z
     TARGET_APPROVER_USER_IDS: csvSnowflakes,
     PREFIX_COMMANDS_ENABLED: booleanString,
     MESSAGE_CONTENT_INTENT_ENABLED: booleanString,
-    MANAGED_ROOMS_ENABLED: booleanString
+    MANAGED_ROOMS_ENABLED: booleanString,
+    MANAGED_GUILD_IDS: csvSnowflakes
   })
   .superRefine((value, context) => {
     if (value.PREFIX_COMMANDS_ENABLED && !value.MESSAGE_CONTENT_INTENT_ENABLED) {
@@ -61,6 +75,16 @@ export const voiceEnvironmentSchema = z
         code: "custom",
         message: "Prefix commands require MESSAGE_CONTENT_INTENT_ENABLED=true",
         path: ["PREFIX_COMMANDS_ENABLED"]
+      });
+    }
+    if (
+      (value.AGENT_PREVIOUS_KEY_ID === undefined) !==
+      (value.AGENT_PREVIOUS_AUTH_SECRET === undefined)
+    ) {
+      context.addIssue({
+        code: "custom",
+        message: "Previous agent key ID and secret must be configured together",
+        path: ["AGENT_PREVIOUS_KEY_ID"]
       });
     }
   });

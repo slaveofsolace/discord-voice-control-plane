@@ -79,6 +79,7 @@ function fixture(ownerPresent = true) {
   const bootstrap: AgentBootstrap = {
     type: "bootstrap",
     deployment_id: "test",
+    tenant_id: "test",
     desired_connected: false,
     paused: false,
     authorized_target: null,
@@ -98,12 +99,15 @@ function fixture(ownerPresent = true) {
   };
   const service = new ManagedRoomService({
     deploymentId: "test",
+    managedGuildIds: new Set([guildId]),
+    managedRoomsEnabled: true,
     onEvent: (event) => events.push(event),
     prefixCommandsEnabled: true,
     targetApproverUserIds: new Set()
   });
   service.applyBootstrap(bootstrap);
   return {
+    bootstrap,
     channel,
     deleteChannel,
     disconnect,
@@ -181,6 +185,106 @@ describe("managed room commands", () => {
     });
   });
 
+  it("records a new authorized target guild as presence-only", () => {
+    const { bootstrap, channel, guild, owner } = fixture();
+    const events: unknown[] = [];
+    const service = new ManagedRoomService({
+      deploymentId: "test",
+      managedGuildIds: new Set(),
+      managedRoomsEnabled: true,
+      onEvent: (event) => events.push(event),
+      prefixCommandsEnabled: true,
+      targetApproverUserIds: new Set()
+    });
+    (owner.permissions.has as ReturnType<typeof vi.fn>).mockReturnValue(true);
+    service.applyBootstrap({
+      ...bootstrap,
+      guild_configs: [],
+      managed_rooms: []
+    });
+    service.authorizeTarget(guild as unknown as Guild, owner, channel);
+    expect(events.slice(-2)).toMatchObject([
+      {
+        type: "guild_config_event",
+        config: {
+          feature_profile: "presence_only",
+          managed_rooms_enabled: false,
+          prefix_commands_enabled: false
+        }
+      },
+      { type: "authorized_target_event" }
+    ]);
+    expect(service.status(guildId)).toContain("Profile: presence_only");
+  });
+
+  it("fences setup and enablement when managed rooms are not available", async () => {
+    const { bootstrap, guild, owner } = fixture();
+    (owner.permissions.has as ReturnType<typeof vi.fn>).mockReturnValue(true);
+    const disabled = new ManagedRoomService({
+      deploymentId: "test",
+      managedGuildIds: new Set([guildId]),
+      managedRoomsEnabled: false,
+      onEvent: vi.fn(),
+      prefixCommandsEnabled: false,
+      targetApproverUserIds: new Set()
+    });
+    disabled.applyBootstrap(bootstrap);
+    await expect(disabled.setup(guild as unknown as Guild, owner)).rejects.toThrow(
+      "MANAGED_ROOMS_DISABLED_BY_DEPLOYMENT"
+    );
+    expect(() => disabled.setEnabled(guild as unknown as Guild, owner, true)).toThrow(
+      "MANAGED_ROOMS_DISABLED_BY_DEPLOYMENT"
+    );
+
+    const unauthorizedGuild = new ManagedRoomService({
+      deploymentId: "test",
+      managedGuildIds: new Set(),
+      managedRoomsEnabled: true,
+      onEvent: vi.fn(),
+      prefixCommandsEnabled: false,
+      targetApproverUserIds: new Set()
+    });
+    unauthorizedGuild.applyBootstrap(bootstrap);
+    await expect(unauthorizedGuild.setup(guild as unknown as Guild, owner)).rejects.toThrow(
+      "MANAGED_GUILD_NOT_AUTHORIZED"
+    );
+    expect(() => unauthorizedGuild.setEnabled(guild as unknown as Guild, owner, true)).toThrow(
+      "MANAGED_GUILD_NOT_AUTHORIZED"
+    );
+
+    const presenceOnly = new ManagedRoomService({
+      deploymentId: "test",
+      managedGuildIds: new Set([guildId]),
+      managedRoomsEnabled: true,
+      onEvent: vi.fn(),
+      prefixCommandsEnabled: false,
+      targetApproverUserIds: new Set()
+    });
+    const managedConfig = bootstrap.guild_configs[0];
+    if (managedConfig === undefined) throw new Error("TEST_MANAGED_CONFIG_MISSING");
+    presenceOnly.applyBootstrap({
+      ...bootstrap,
+      guild_configs: [
+        {
+          ...managedConfig,
+          feature_profile: "presence_only",
+          managed_rooms_enabled: false,
+          prefix_commands_enabled: false,
+          category_id: null,
+          lobby_channel_id: null,
+          command_channel_id: null
+        }
+      ],
+      managed_rooms: []
+    });
+    await expect(presenceOnly.setup(guild as unknown as Guild, owner)).rejects.toThrow(
+      "PRESENCE_ONLY_PROFILE"
+    );
+    expect(() => presenceOnly.setEnabled(guild as unknown as Guild, owner, true)).toThrow(
+      "PRESENCE_ONLY_PROFILE"
+    );
+  });
+
   it("reports room information", async () => {
     const { owner, service } = fixture();
     await expect(service.execute({ member: owner, subcommand: "info" })).resolves.toContain(
@@ -221,6 +325,30 @@ describe("managed room commands", () => {
     expect(overwriteEdit).toHaveBeenCalledWith(targetId, { Connect: false });
     expect(overwriteEdit).toHaveBeenCalledWith(targetId, { Connect: null });
     expect(disconnect).toHaveBeenCalledOnce();
+  });
+
+  it("rejects ACL additions beyond the stored per-list cap before editing Discord", async () => {
+    const permitted = fixture();
+    permitted.room.settings.permitted_user_ids = Array.from({ length: 100 }, (_, index) =>
+      String(200000000000000000n + BigInt(index))
+    );
+    await expect(
+      permitted.service.execute({
+        member: permitted.owner,
+        subcommand: "permit",
+        userId: targetId
+      })
+    ).rejects.toThrow("PERMITTED_USER_LIMIT_REACHED");
+    expect(permitted.overwriteEdit).not.toHaveBeenCalled();
+
+    const banned = fixture();
+    banned.room.settings.banned_user_ids = Array.from({ length: 100 }, (_, index) =>
+      String(300000000000000000n + BigInt(index))
+    );
+    await expect(
+      banned.service.execute({ member: banned.owner, subcommand: "ban", userId: targetId })
+    ).rejects.toThrow("BANNED_USER_LIMIT_REACHED");
+    expect(banned.overwriteEdit).not.toHaveBeenCalled();
   });
 
   it("claims only when the prior owner is absent", async () => {
@@ -287,6 +415,17 @@ describe("managed room commands", () => {
     };
     const newState = { channelId: null, guild: oldState.guild, member: owner };
     await service.handleVoiceState(oldState as never, newState as never);
+    await vi.advanceTimersByTimeAsync(15_000);
+    expect(deleteChannel).toHaveBeenCalledOnce();
+    vi.useRealTimers();
+  });
+
+  it("schedules bot-only room cleanup during restart reconciliation", async () => {
+    vi.useFakeTimers();
+    const { deleteChannel, guild, members, service } = fixture();
+    members.clear();
+    members.set("100000000000000010", { user: { bot: true } } as unknown as GuildMember);
+    await service.reconcileGuild(guild as unknown as Guild);
     await vi.advanceTimersByTimeAsync(15_000);
     expect(deleteChannel).toHaveBeenCalledOnce();
     vi.useRealTimers();

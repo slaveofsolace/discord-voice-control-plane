@@ -28,13 +28,20 @@ export interface VoiceControllerOptions {
 }
 
 const maximumTransientRetries = 5;
+const daveNegotiationTimeoutMs = 5_000;
+const voiceStateDisconnectTimeoutMs = 2_000;
+
+interface ExpectedDisconnect {
+  channelId: string;
+  finish: () => void;
+}
 
 export class VoiceController {
   readonly #deploymentRelayLimiter = new FixedWindowRateLimiter(20, 60_000);
   readonly #operatorRelayLimiter = new FixedWindowRateLimiter(5, 60_000);
   #connection: VoiceConnection | null = null;
   #daveEstablished = false;
-  #intentionalDisconnect = false;
+  #expectedDisconnect: ExpectedDisconnect | null = null;
   #lastErrorCode: string | null = null;
   #machine: VoiceMachineSnapshot = {
     state: "DISABLED",
@@ -47,6 +54,10 @@ export class VoiceController {
   #target: AuthorizedTarget | null = null;
 
   constructor(private readonly options: VoiceControllerOptions) {}
+
+  start(): void {
+    this.transition({ type: "START" });
+  }
 
   get status(): AgentStatus {
     const ready = this.#connection?.state.status === VoiceConnectionStatus.Ready;
@@ -90,7 +101,13 @@ export class VoiceController {
       this.publishStatus();
       return;
     }
-    if (desiredConnected) await this.connect("bootstrap_desired_state");
+    if (desiredConnected) {
+      await this.connect("bootstrap_desired_state");
+      return;
+    }
+    this.transition({ type: "LEAVE" });
+    this.#machine.reason = "bootstrap_disabled";
+    this.destroyConnection();
   }
 
   async execute(command: CommandEnvelope): Promise<CommandAck> {
@@ -114,7 +131,7 @@ export class VoiceController {
           summary = "Left the authorized voice channel.";
           break;
         case "reconnect":
-          this.destroyConnection();
+          await this.disconnectForReconnect();
           await this.connect("operator_reconnect");
           summary = "Reconnected to the authorized voice channel.";
           break;
@@ -130,7 +147,11 @@ export class VoiceController {
           break;
         case "relay": {
           const payload = parseActionPayload("relay", command.payload);
-          targetMessageId = await this.relay(command.actor_user_id, payload.text);
+          targetMessageId = await this.relay(
+            command.actor_user_id,
+            payload.text,
+            command.command_id
+          );
           summary = "Relayed one plain-text message to the authorized channel.";
           break;
         }
@@ -166,9 +187,20 @@ export class VoiceController {
   }
 
   handleOwnVoiceState(oldState: VoiceState, newState: VoiceState): void {
-    if (this.#intentionalDisconnect || !this.#machine.desiredConnected) return;
     const targetChannelId = this.#target?.voice_channel_id;
     if (targetChannelId === undefined || oldState.channelId !== targetChannelId) return;
+    if (newState.channelId === null && this.#expectedDisconnect?.channelId === targetChannelId) {
+      this.#expectedDisconnect.finish();
+      return;
+    }
+    if (
+      !this.#machine.desiredConnected ||
+      this.#machine.state === "PAUSED" ||
+      this.#machine.state === "DISABLED" ||
+      this.#machine.state === "SHUTTING_DOWN"
+    ) {
+      return;
+    }
     if (newState.channelId === null) {
       this.block("MODERATOR_DISCONNECT", "MODERATOR_DISCONNECT");
     } else if (newState.channelId !== targetChannelId) {
@@ -191,6 +223,10 @@ export class VoiceController {
   }
 
   private async connect(reason: string): Promise<void> {
+    if (this.#connection?.state.status === VoiceConnectionStatus.Ready && this.#daveEstablished) {
+      this.transition({ type: "CONNECTED" });
+      return;
+    }
     this.#lastErrorCode = null;
     this.transition({ type: "CONNECT_REQUEST" });
     this.#machine.reason = reason;
@@ -199,11 +235,28 @@ export class VoiceController {
 
   private async establishConnection(): Promise<void> {
     const target = this.#target;
-    if (target === null) throw new Error("AUTHORIZED_TARGET_NOT_SET");
-    if (!this.options.client.isReady()) throw new Error("DISCORD_GATEWAY_NOT_READY");
-    const guild = await this.options.client.guilds.fetch(target.guild_id);
-    const channel = await guild.channels.fetch(target.voice_channel_id);
-    if (channel?.type !== ChannelType.GuildVoice) throw new Error("AUTHORIZED_TARGET_NOT_VOICE");
+    if (target === null) {
+      this.block("AUTHORIZED_TARGET_NOT_SET", "AUTH_FAILURE");
+      throw new Error("AUTHORIZED_TARGET_NOT_SET");
+    }
+    if (!this.options.client.isReady()) {
+      this.handleTransientFailure("DISCORD_GATEWAY_NOT_READY");
+      throw new Error("DISCORD_GATEWAY_NOT_READY");
+    }
+    const guild = await this.options.client.guilds.fetch(target.guild_id).catch(() => null);
+    if (guild === null) {
+      this.block("AUTHORIZED_GUILD_UNAVAILABLE", "AUTH_FAILURE");
+      throw new Error("AUTHORIZED_GUILD_UNAVAILABLE");
+    }
+    const channel = await guild.channels.fetch(target.voice_channel_id).catch(() => null);
+    if (channel === null) {
+      this.block("TARGET_CHANNEL_DELETED", "CHANNEL_DELETED");
+      throw new Error("TARGET_CHANNEL_DELETED");
+    }
+    if (channel.type !== ChannelType.GuildVoice) {
+      this.block("AUTHORIZED_TARGET_NOT_VOICE", "AUTH_FAILURE");
+      throw new Error("AUTHORIZED_TARGET_NOT_VOICE");
+    }
     const me = guild.members.me ?? (await guild.members.fetchMe());
     const permissions = channel.permissionsFor(me);
     if (
@@ -214,8 +267,7 @@ export class VoiceController {
       throw new Error("VOICE_PERMISSION_LOST");
     }
     this.cancelRetry();
-    this.destroyConnection();
-    this.#intentionalDisconnect = false;
+    if (this.#connection !== null) await this.disconnectForReconnect();
     this.#daveEstablished = false;
     const connection = joinVoiceChannel({
       adapterCreator: guild.voiceAdapterCreator,
@@ -228,20 +280,29 @@ export class VoiceController {
     });
     this.#connection = connection;
     connection.on("transitioned", () => {
+      if (this.#connection !== connection) return;
       this.#daveEstablished = true;
-      this.publishStatus();
+      if (connection.state.status === VoiceConnectionStatus.Ready) {
+        this.transition({ type: "CONNECTED" });
+      } else {
+        this.publishStatus();
+      }
     });
-    connection.on("error", (error) => this.handleConnectionError(error));
+    connection.on("error", (error) => this.handleConnectionError(connection, error));
     connection.on("stateChange", (oldState, newState) =>
-      this.handleConnectionState(oldState, newState)
+      this.handleConnectionState(connection, oldState, newState)
     );
     try {
       await entersState(connection, VoiceConnectionStatus.Ready, 20_000);
       if (this.#connection !== connection) throw new Error("VOICE_CONNECTION_SUPERSEDED");
       this.#daveEstablished = this.#daveEstablished || connection.voicePrivacyCode !== undefined;
+      if (!this.#daveEstablished) await this.waitForDave(connection);
       this.transition({ type: "CONNECTED" });
     } catch (error) {
-      if (this.#connection === connection && this.#machine.state !== "BLOCKED") {
+      if (
+        this.#connection === connection &&
+        (this.#machine.state === "CONNECTING" || this.#machine.state === "DEGRADED")
+      ) {
         this.handleTransientFailure("VOICE_CONNECT_TIMEOUT");
       }
       throw error instanceof Error ? error : new Error("VOICE_CONNECT_FAILED");
@@ -249,17 +310,18 @@ export class VoiceController {
   }
 
   private handleConnectionState(
+    connection: VoiceConnection,
     _oldState: VoiceConnectionState,
     newState: VoiceConnectionState
   ): void {
+    if (this.#connection !== connection) return;
     if (newState.status === VoiceConnectionStatus.Ready) {
       this.#daveEstablished =
         this.#daveEstablished || this.#connection?.voicePrivacyCode !== undefined;
-      this.transition({ type: "CONNECTED" });
+      this.transition({ type: this.#daveEstablished ? "CONNECTED" : "DAVE_PENDING" });
       return;
     }
-    if (newState.status !== VoiceConnectionStatus.Disconnected || this.#intentionalDisconnect)
-      return;
+    if (newState.status !== VoiceConnectionStatus.Disconnected) return;
     if (
       newState.reason === VoiceConnectionDisconnectReason.WebSocketClose &&
       newState.closeCode === 4014
@@ -270,7 +332,8 @@ export class VoiceController {
     this.handleTransientFailure("VOICE_TRANSPORT_DISCONNECTED");
   }
 
-  private handleConnectionError(error: Error): void {
+  private handleConnectionError(connection: VoiceConnection, error: Error): void {
+    if (this.#connection !== connection) return;
     const normalized = error.message.toUpperCase();
     if (
       normalized.includes("DAVE") ||
@@ -285,6 +348,46 @@ export class VoiceController {
       return;
     }
     this.handleTransientFailure("VOICE_CONNECTION_ERROR");
+  }
+
+  private async waitForDave(connection: VoiceConnection): Promise<void> {
+    if (this.#daveEstablished || connection.voicePrivacyCode !== undefined) {
+      this.#daveEstablished = true;
+      return;
+    }
+    this.transition({ type: "DAVE_PENDING" });
+    const established = await new Promise<boolean>((resolve) => {
+      let settled = false;
+      const finish = (value: boolean): void => {
+        if (settled) return;
+        settled = true;
+        clearTimeout(timer);
+        connection.off("transitioned", transitioned);
+        resolve(value);
+      };
+      const transitioned = (): void => finish(true);
+      const timer = setTimeout(() => finish(false), daveNegotiationTimeoutMs);
+      connection.once("transitioned", transitioned);
+    });
+    if (established && this.#connection === connection) {
+      this.#daveEstablished = true;
+      return;
+    }
+    if (
+      this.#connection !== connection ||
+      !this.#machine.desiredConnected ||
+      this.#machine.state === "PAUSED" ||
+      this.#machine.state === "DISABLED" ||
+      this.#machine.state === "SHUTTING_DOWN"
+    ) {
+      throw new Error("VOICE_CONNECTION_SUPERSEDED");
+    }
+    if (this.#machine.retryCount >= 1) {
+      this.block("DAVE_NEGOTIATION_FAILED", "PROTOCOL_FAILURE");
+    } else {
+      this.handleTransientFailure("DAVE_NEGOTIATION_TIMEOUT");
+    }
+    throw new Error("DAVE_NEGOTIATION_TIMEOUT");
   }
 
   private handleTransientFailure(reason: string): void {
@@ -328,7 +431,7 @@ export class VoiceController {
     this.destroyConnection();
   }
 
-  private async relay(actorUserId: string, input: string): Promise<string> {
+  private async relay(actorUserId: string, input: string, commandId: string): Promise<string> {
     const target = this.#target;
     if (target === null) throw new Error("AUTHORIZED_TARGET_NOT_SET");
     if (this.#machine.state !== "CONNECTED") throw new Error("VOICE_NOT_CONNECTED");
@@ -341,7 +444,12 @@ export class VoiceController {
     const guild = await this.options.client.guilds.fetch(target.guild_id);
     const channel = await guild.channels.fetch(target.text_channel_id);
     if (!channel?.isTextBased()) throw new Error("AUTHORIZED_TEXT_TARGET_INVALID");
-    const message = await channel.send({ content: text, allowedMentions: { parse: [] } });
+    const message = await channel.send({
+      content: text,
+      allowedMentions: { parse: [] },
+      nonce: commandId.replaceAll("-", "").slice(0, 25),
+      enforceNonce: true
+    });
     return message.id;
   }
 
@@ -352,16 +460,40 @@ export class VoiceController {
 
   private destroyConnection(): void {
     this.cancelRetry();
+    this.#expectedDisconnect?.finish();
     const connection = this.#connection;
     this.#connection = null;
     this.#daveEstablished = false;
     if (connection !== null && connection.state.status !== VoiceConnectionStatus.Destroyed) {
-      this.#intentionalDisconnect = true;
       connection.destroy();
-      queueMicrotask(() => {
-        this.#intentionalDisconnect = false;
-      });
     }
+  }
+
+  private async disconnectForReconnect(): Promise<void> {
+    this.cancelRetry();
+    this.#expectedDisconnect?.finish();
+    const connection = this.#connection;
+    this.#connection = null;
+    this.#daveEstablished = false;
+    if (connection === null || connection.state.status === VoiceConnectionStatus.Destroyed) return;
+    const targetChannelId = this.#target?.voice_channel_id;
+    if (targetChannelId === undefined) {
+      connection.destroy();
+      return;
+    }
+    await new Promise<void>((resolve) => {
+      let settled = false;
+      const finish = (): void => {
+        if (settled) return;
+        settled = true;
+        clearTimeout(timer);
+        if (this.#expectedDisconnect?.finish === finish) this.#expectedDisconnect = null;
+        resolve();
+      };
+      const timer = setTimeout(finish, voiceStateDisconnectTimeoutMs);
+      this.#expectedDisconnect = { channelId: targetChannelId, finish };
+      connection.destroy();
+    });
   }
 
   private cancelRetry(): void {

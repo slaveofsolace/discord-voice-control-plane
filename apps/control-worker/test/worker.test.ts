@@ -7,7 +7,7 @@ import {
   SELF,
   type D1Migration
 } from "cloudflare:test";
-import { beforeAll, describe, expect, it } from "vitest";
+import { beforeAll, describe, expect, it, vi } from "vitest";
 
 import { signCommandEnvelope } from "@discord-vc-control/security";
 
@@ -39,6 +39,58 @@ describe("control worker", () => {
   it("requires internal authentication", async () => {
     const response = await SELF.fetch("https://example.test/internal/status");
     expect(response.status).toBe(401);
+  });
+
+  it("uses server receipt time for heartbeat freshness", async () => {
+    const stub = env.AGENT_SESSION.get(
+      env.AGENT_SESSION.idFromName(`heartbeat-${crypto.randomUUID()}`)
+    );
+    const before = Date.now();
+    await runInDurableObject(stub, async (instance, state) => {
+      const close = vi.fn();
+      await instance.webSocketMessage(
+        { close } as unknown as WebSocket,
+        JSON.stringify({
+          type: "heartbeat",
+          deployment_id: env.DEPLOYMENT_ID,
+          sent_at: Date.now() + 24 * 60 * 60_000,
+          gateway_sequence: 1
+        })
+      );
+      const row = state.storage.sql
+        .exec<{ last_heartbeat: number | null }>(
+          "SELECT last_heartbeat FROM session_state WHERE id = 1"
+        )
+        .one();
+      expect(row.last_heartbeat).toBeGreaterThanOrEqual(before);
+      expect(row.last_heartbeat).toBeLessThanOrEqual(Date.now());
+      expect(close).not.toHaveBeenCalled();
+    });
+  });
+
+  it("rejects a heartbeat for another deployment before updating liveness", async () => {
+    const stub = env.AGENT_SESSION.get(
+      env.AGENT_SESSION.idFromName(`wrong-heartbeat-${crypto.randomUUID()}`)
+    );
+    await runInDurableObject(stub, async (instance, state) => {
+      const close = vi.fn();
+      await instance.webSocketMessage(
+        { close } as unknown as WebSocket,
+        JSON.stringify({
+          type: "heartbeat",
+          deployment_id: "another-deployment",
+          sent_at: Date.now(),
+          gateway_sequence: 1
+        })
+      );
+      const row = state.storage.sql
+        .exec<{ last_error: string | null; last_heartbeat: number | null }>(
+          "SELECT last_error, last_heartbeat FROM session_state WHERE id = 1"
+        )
+        .one();
+      expect(row).toMatchObject({ last_error: "WRONG_DEPLOYMENT", last_heartbeat: null });
+      expect(close).toHaveBeenCalledWith(1008, "invalid agent message");
+    });
   });
 
   it("enforces application, guild, channel, actor, and elevation allowlists", () => {
@@ -132,6 +184,38 @@ describe("control worker", () => {
     expect((await send(crypto.randomUUID())).status).toBe(409);
   });
 
+  it("rejects a signed command for another tenant", async () => {
+    const now = Date.now();
+    const envelope = await signCommandEnvelope(
+      {
+        version: 1,
+        command_id: crypto.randomUUID(),
+        issued_at: now,
+        expires_at: now + 30_000,
+        nonce: crypto.randomUUID(),
+        actor_user_id: "100000000000000004",
+        control_guild_id: env.CONTROL_GUILD_ID,
+        control_channel_id: "100000000000000003",
+        deployment_id: env.DEPLOYMENT_ID,
+        tenant_id: "another-tenant",
+        action: "status",
+        payload: {},
+        kid: env.AGENT_KEY_ID
+      },
+      env.AGENT_AUTH_SECRET
+    );
+    const stub = env.AGENT_SESSION.get(
+      env.AGENT_SESSION.idFromName(`wrong-tenant-${crypto.randomUUID()}`)
+    );
+    const response = await stub.fetch("https://session/commands", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(envelope)
+    });
+    expect(response.status).toBe(409);
+    await expect(response.json()).resolves.toEqual({ error: "WRONG_TENANT" });
+  });
+
   it("preserves a pending idempotency record across a Durable Object runtime restart", async () => {
     const now = Date.now();
     const envelope = await signCommandEnvelope(
@@ -209,6 +293,49 @@ describe("control worker", () => {
     await expect(runDurableObjectAlarm(stub)).resolves.toBe(true);
     const status = await stub.fetch("https://session/status");
     await expect(status.json()).resolves.toMatchObject({ pendingCommands: 0 });
+  });
+
+  it("replays ordered agent state events from the Durable Object outbox", async () => {
+    const guildId = "100000000000000077";
+    const stub = env.AGENT_SESSION.get(
+      env.AGENT_SESSION.idFromName(`state-outbox-${crypto.randomUUID()}`)
+    );
+    const event = {
+      type: "guild_config_event",
+      config: {
+        deployment_id: env.DEPLOYMENT_ID,
+        guild_id: guildId,
+        feature_profile: "presence_only",
+        managed_rooms_enabled: false,
+        prefix_commands_enabled: false,
+        category_id: null,
+        lobby_channel_id: null,
+        command_channel_id: null
+      }
+    };
+    await runInDurableObject(stub, async (_instance, state) => {
+      state.storage.sql.exec(
+        "INSERT INTO state_outbox (event_json, created_at) VALUES (?, ?)",
+        JSON.stringify(event),
+        Date.now()
+      );
+      await state.storage.setAlarm(Date.now() + 1_000);
+    });
+    await expect(runDurableObjectAlarm(stub)).resolves.toBe(true);
+    const stored = await env.DB.prepare(
+      `SELECT feature_profile, managed_rooms_enabled
+         FROM guild_configs
+        WHERE deployment_id = ? AND guild_id = ?`
+    )
+      .bind(env.DEPLOYMENT_ID, guildId)
+      .first<{ feature_profile: string; managed_rooms_enabled: number }>();
+    expect(stored).toEqual({ feature_profile: "presence_only", managed_rooms_enabled: 0 });
+    await runInDurableObject(stub, (_instance, state) => {
+      const row = state.storage.sql
+        .exec<{ count: number }>("SELECT COUNT(*) AS count FROM state_outbox")
+        .one();
+      expect(row.count).toBe(0);
+    });
   });
 
   it("enforces audit retention and the hard result cap against migrated D1", async () => {

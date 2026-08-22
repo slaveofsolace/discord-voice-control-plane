@@ -34,6 +34,16 @@ describe("voice state machine", () => {
     ).toEqual(disabled);
   });
 
+  it("reports DAVE negotiation as degraded until the encrypted session is ready", () => {
+    const connecting = transitionVoiceMachine(disabled, { type: "CONNECT_REQUEST" });
+    const degraded = transitionVoiceMachine(connecting, { type: "DAVE_PENDING" });
+    expect(degraded).toMatchObject({ state: "DEGRADED", desiredConnected: true });
+    expect(transitionVoiceMachine(degraded, { type: "CONNECTED" })).toMatchObject({
+      state: "CONNECTED",
+      desiredConnected: true
+    });
+  });
+
   it.each([
     "MODERATOR_DISCONNECT",
     "MODERATOR_MOVE",

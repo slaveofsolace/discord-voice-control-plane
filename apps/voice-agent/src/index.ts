@@ -79,6 +79,8 @@ const controller = new VoiceController({
 
 const managedRooms = new ManagedRoomService({
   deploymentId: environment.DEPLOYMENT_ID,
+  managedGuildIds: environment.MANAGED_GUILD_IDS,
+  managedRoomsEnabled: environment.MANAGED_ROOMS_ENABLED,
   prefixCommandsEnabled: environment.PREFIX_COMMANDS_ENABLED,
   targetApproverUserIds: environment.TARGET_APPROVER_USER_IDS,
   onEvent: (event: AgentMessage) => {
@@ -91,8 +93,25 @@ async function applyBootstrap(bootstrap: AgentBootstrap): Promise<void> {
   lastBootstrap = bootstrap;
   managedRooms.applyBootstrap(bootstrap);
   controller.setTarget(bootstrap.authorized_target);
-  if (client.isReady())
-    await controller.applyDesiredState(bootstrap.desired_connected, bootstrap.paused);
+  if (client.isReady()) {
+    await reconcileManagedRooms(bootstrap);
+    await controller
+      .applyDesiredState(bootstrap.desired_connected, bootstrap.paused)
+      .catch((error: unknown) =>
+        log("warn", "bootstrap_voice_state_rejected", {
+          code: error instanceof Error ? error.message : "UNKNOWN"
+        })
+      );
+  }
+}
+
+async function reconcileManagedRooms(bootstrap: AgentBootstrap): Promise<void> {
+  const guildIds = new Set(bootstrap.managed_rooms.map((room) => room.guild_id));
+  for (const guildId of guildIds) {
+    const guild = await client.guilds.fetch(guildId).catch(() => null);
+    if (guild === null) continue;
+    await managedRooms.reconcileGuild(guild);
+  }
 }
 
 async function handleControlCommand(command: CommandEnvelope, duplicate: boolean): Promise<void> {
@@ -110,6 +129,7 @@ async function handleControlCommand(command: CommandEnvelope, duplicate: boolean
 
 const agentClient = new AgentClient({
   deploymentId: environment.DEPLOYMENT_ID,
+  tenantId: environment.TENANT_ID,
   endpoint: environment.AGENT_ENDPOINT,
   keyId: environment.AGENT_KEY_ID,
   secret: environment.AGENT_AUTH_SECRET,
@@ -123,6 +143,7 @@ const agentClient = new AgentClient({
   onBootstrap: applyBootstrap,
   onCommand: handleControlCommand
 });
+controller.start();
 
 function asVoiceSubcommand(value: string): VoiceSubcommand {
   if (!(voiceSubcommands as readonly string[]).includes(value))
@@ -139,7 +160,14 @@ client.once(Events.ClientReady, (readyClient) => {
   void (async () => {
     log("info", "gateway_ready", { bot_user_id: readyClient.user.id });
     if (lastBootstrap !== null) {
-      await controller.applyDesiredState(lastBootstrap.desired_connected, lastBootstrap.paused);
+      await reconcileManagedRooms(lastBootstrap);
+      await controller
+        .applyDesiredState(lastBootstrap.desired_connected, lastBootstrap.paused)
+        .catch((error: unknown) =>
+          log("warn", "bootstrap_voice_state_rejected", {
+            code: error instanceof Error ? error.message : "UNKNOWN"
+          })
+        );
     }
   })().catch((error: unknown) =>
     log("warn", "bootstrap_state_not_applied", {

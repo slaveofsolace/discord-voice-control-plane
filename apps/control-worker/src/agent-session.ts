@@ -6,6 +6,7 @@ import {
   managedRoomSettingsSchema,
   type AgentStatus,
   type AgentBootstrap,
+  type AgentMessage,
   type CommandAck
 } from "@discord-vc-control/contracts";
 import {
@@ -34,6 +35,16 @@ interface AuditOutboxRow extends Record<string, SqlStorageValue> {
   id: number;
   event_json: string;
 }
+
+interface StateOutboxRow extends Record<string, SqlStorageValue> {
+  id: number;
+  event_json: string;
+}
+
+type PersistentAgentEvent = Extract<
+  AgentMessage,
+  { type: "authorized_target_event" | "guild_config_event" | "managed_room_event" }
+>;
 
 interface ExpirationRow extends Record<string, SqlStorageValue> {
   expires_at: number | null;
@@ -69,6 +80,11 @@ export class AgentSession extends DurableObject<Env> {
         event_json TEXT NOT NULL,
         created_at INTEGER NOT NULL
       );
+      CREATE TABLE IF NOT EXISTS state_outbox (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        event_json TEXT NOT NULL,
+        created_at INTEGER NOT NULL
+      );
     `);
   }
 
@@ -94,6 +110,13 @@ export class AgentSession extends DurableObject<Env> {
 
   async alarm(): Promise<void> {
     this.purgeExpiredSessionRows();
+    let retryAt: number | null = null;
+    try {
+      await this.flushAuditOutbox();
+      await this.flushStateOutbox();
+    } catch {
+      retryAt = Date.now() + 5_000;
+    }
     const next = this.ctx.storage.sql
       .exec<ExpirationRow>(
         `SELECT MIN(expires_at) AS expires_at FROM (
@@ -103,7 +126,13 @@ export class AgentSession extends DurableObject<Env> {
          )`
       )
       .one();
-    if (next.expires_at !== null) await this.ctx.storage.setAlarm(next.expires_at);
+    const nextAt =
+      retryAt === null
+        ? next.expires_at
+        : next.expires_at === null
+          ? retryAt
+          : Math.min(retryAt, next.expires_at);
+    if (nextAt !== null) await this.ctx.storage.setAlarm(nextAt);
   }
 
   async webSocketMessage(webSocket: WebSocket, message: ArrayBuffer | string): Promise<void> {
@@ -111,24 +140,21 @@ export class AgentSession extends DurableObject<Env> {
       if (typeof message !== "string") throw new Error("BINARY_AGENT_MESSAGE_REJECTED");
       const parsed = agentMessageSchema.parse(JSON.parse(message));
       if (parsed.type === "heartbeat") {
+        if (parsed.deployment_id !== this.env.DEPLOYMENT_ID) throw new Error("WRONG_DEPLOYMENT");
         this.ctx.storage.sql.exec(
           "UPDATE session_state SET last_heartbeat = ?, last_error = NULL WHERE id = 1",
-          parsed.sent_at
+          Date.now()
         );
         return;
       }
       if (parsed.type === "status") {
+        if (parsed.deployment_id !== this.env.DEPLOYMENT_ID) throw new Error("WRONG_DEPLOYMENT");
+        const receivedAt = Date.now();
         this.ctx.storage.sql.exec(
           "UPDATE session_state SET status_json = ?, last_heartbeat = ?, last_error = NULL WHERE id = 1",
           JSON.stringify(parsed),
-          parsed.last_health_at
+          receivedAt
         );
-        await this.storeObservedStatus(parsed).catch(() => {
-          this.ctx.storage.sql.exec(
-            "UPDATE session_state SET last_error = ? WHERE id = 1",
-            "D1_STATUS_PERSIST_FAILED"
-          );
-        });
         return;
       }
       if (parsed.type === "ack") {
@@ -136,14 +162,14 @@ export class AgentSession extends DurableObject<Env> {
         return;
       }
       if (parsed.type === "managed_room_event") {
-        await this.storeManagedRoomEvent(parsed);
+        await this.storeStateEvent(parsed);
         return;
       }
       if (parsed.type === "guild_config_event") {
-        await this.storeGuildConfig(parsed.config);
+        await this.storeStateEvent(parsed);
         return;
       }
-      await this.storeAuthorizedTarget(parsed.target);
+      await this.storeStateEvent(parsed);
     } catch (error) {
       const code = error instanceof Error ? error.message.slice(0, 200) : "INVALID_AGENT_MESSAGE";
       this.ctx.storage.sql.exec("UPDATE session_state SET last_error = ? WHERE id = 1", code);
@@ -218,6 +244,9 @@ export class AgentSession extends DurableObject<Env> {
     });
     if (verified.deployment_id !== this.env.DEPLOYMENT_ID) {
       return Response.json({ error: "WRONG_DEPLOYMENT" }, { status: 409 });
+    }
+    if (verified.tenant_id !== this.env.TENANT_ID) {
+      return Response.json({ error: "WRONG_TENANT" }, { status: 409 });
     }
     this.purgeExpiredSessionRows();
     const existing = this.receipt(verified.command_id);
@@ -325,6 +354,7 @@ export class AgentSession extends DurableObject<Env> {
   private async sendBootstrap(socket: WebSocket): Promise<void> {
     await this.ensureDeployment();
     await this.flushAuditOutbox();
+    await this.flushStateOutbox();
     const [deployments, configs, rooms, targets] = await Promise.all([
       this.env.DB.prepare(
         "SELECT desired_connected, paused FROM deployments WHERE deployment_id = ? LIMIT 1"
@@ -356,6 +386,7 @@ export class AgentSession extends DurableObject<Env> {
     const bootstrap: AgentBootstrap = {
       type: "bootstrap",
       deployment_id: this.env.DEPLOYMENT_ID,
+      tenant_id: this.env.TENANT_ID,
       desired_connected: Number(deployments.results[0]?.desired_connected ?? 0) === 1,
       paused: Number(deployments.results[0]?.paused ?? 0) === 1,
       guild_configs: configs.results.map((row) => ({
@@ -415,25 +446,6 @@ export class AgentSession extends DurableObject<Env> {
         .bind(now, this.env.DEPLOYMENT_ID)
         .run();
     }
-  }
-
-  private async storeObservedStatus(status: AgentStatus): Promise<void> {
-    if (status.deployment_id !== this.env.DEPLOYMENT_ID) throw new Error("WRONG_DEPLOYMENT");
-    await this.ensureDeployment();
-    await this.env.DB.prepare(
-      `UPDATE deployments
-          SET desired_connected = ?,
-              paused = ?,
-              updated_at = ?
-        WHERE deployment_id = ?`
-    )
-      .bind(
-        status.desired_connected ? 1 : 0,
-        status.observed_state === "PAUSED" ? 1 : 0,
-        Date.now(),
-        this.env.DEPLOYMENT_ID
-      )
-      .run();
   }
 
   private async storeGuildConfig(config: {
@@ -671,6 +683,7 @@ export class AgentSession extends DurableObject<Env> {
         SELECT id FROM audit_outbox ORDER BY id DESC LIMIT 100
       )`
     );
+    await this.scheduleCleanup(Date.now() + 5_000);
     return new Response(null, { status: 204 });
   }
 
@@ -681,6 +694,79 @@ export class AgentSession extends DurableObject<Env> {
       await this.persistAuditEvent(JSON.parse(row.event_json) as Record<string, unknown>);
       this.ctx.storage.sql.exec("DELETE FROM audit_outbox WHERE id = ?", row.id);
     }
+  }
+
+  private async storeStateEvent(event: PersistentAgentEvent): Promise<void> {
+    const deploymentId =
+      event.type === "managed_room_event"
+        ? event.operation === "upsert"
+          ? event.room.deployment_id
+          : event.deployment_id
+        : event.type === "guild_config_event"
+          ? event.config.deployment_id
+          : event.target.deployment_id;
+    if (deploymentId !== this.env.DEPLOYMENT_ID) throw new Error("WRONG_DEPLOYMENT");
+    const pending = this.ctx.storage.sql
+      .exec<{ count: number }>("SELECT COUNT(*) AS count FROM state_outbox")
+      .one().count;
+    if (pending === 0) {
+      try {
+        await this.persistStateEvent(event);
+        return;
+      } catch {
+        // Preserve ordering by putting the first failed write into the same queue as later events.
+      }
+    }
+    this.ctx.storage.sql.exec(
+      "INSERT INTO state_outbox (event_json, created_at) VALUES (?, ?)",
+      JSON.stringify(event),
+      Date.now()
+    );
+    this.ctx.storage.sql.exec(
+      `DELETE FROM state_outbox WHERE id NOT IN (
+        SELECT id FROM state_outbox ORDER BY id DESC LIMIT 1000
+      )`
+    );
+    this.ctx.storage.sql.exec(
+      "UPDATE session_state SET last_error = ? WHERE id = 1",
+      "D1_STATE_EVENT_QUEUED"
+    );
+    await this.scheduleCleanup(Date.now() + 5_000);
+    await this.flushStateOutbox().catch(() => undefined);
+  }
+
+  private async flushStateOutbox(): Promise<void> {
+    for (const row of this.ctx.storage.sql.exec<StateOutboxRow>(
+      "SELECT id, event_json FROM state_outbox ORDER BY id LIMIT 1000"
+    )) {
+      const parsed = agentMessageSchema.parse(JSON.parse(row.event_json));
+      if (
+        parsed.type !== "managed_room_event" &&
+        parsed.type !== "guild_config_event" &&
+        parsed.type !== "authorized_target_event"
+      ) {
+        throw new Error("INVALID_STATE_OUTBOX_EVENT");
+      }
+      await this.persistStateEvent(parsed);
+      this.ctx.storage.sql.exec("DELETE FROM state_outbox WHERE id = ?", row.id);
+    }
+    this.ctx.storage.sql.exec(
+      `UPDATE session_state
+          SET last_error = CASE WHEN last_error = 'D1_STATE_EVENT_QUEUED' THEN NULL ELSE last_error END
+        WHERE id = 1`
+    );
+  }
+
+  private async persistStateEvent(event: PersistentAgentEvent): Promise<void> {
+    if (event.type === "managed_room_event") {
+      await this.storeManagedRoomEvent(event);
+      return;
+    }
+    if (event.type === "guild_config_event") {
+      await this.storeGuildConfig(event.config);
+      return;
+    }
+    await this.storeAuthorizedTarget(event.target);
   }
 
   private async persistAuditEvent(event: Record<string, unknown>): Promise<void> {

@@ -171,6 +171,7 @@ export type AuthorizedTarget = z.infer<typeof authorizedTargetSchema>;
 export const agentBootstrapSchema = z.object({
   type: z.literal("bootstrap"),
   deployment_id: z.string().min(1).max(64),
+  tenant_id: z.string().min(1).max(64),
   desired_connected: z.boolean(),
   paused: z.boolean(),
   guild_configs: z.array(guildConfigRecordSchema),
@@ -226,6 +227,7 @@ export interface VoiceMachineSnapshot {
 export type VoiceMachineEvent =
   | { type: "START" }
   | { type: "CONNECT_REQUEST" }
+  | { type: "DAVE_PENDING" }
   | { type: "CONNECTED" }
   | { type: "TRANSIENT_DISCONNECT"; reason: string }
   | { type: "RETRY_TIMER" }
@@ -298,6 +300,12 @@ export function transitionVoiceMachine(
         retryCount: 0,
         circuitOpen: false,
         reason: "voice_ready"
+      };
+    case "DAVE_PENDING":
+      return {
+        ...current,
+        state: "DEGRADED",
+        reason: "dave_negotiating"
       };
     case "TRANSIENT_DISCONNECT":
       if (!current.desiredConnected || current.circuitOpen || current.state === "PAUSED") {

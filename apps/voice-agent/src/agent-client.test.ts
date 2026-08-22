@@ -40,7 +40,11 @@ describe("agent WebSocket client", () => {
     const server = createServer();
     const webSockets = new WebSocketServer({ noServer: true });
     let upgradeHeaders: Record<string, string | string[] | undefined> = {};
+    const outboundMessages: unknown[] = [];
     const connection = new Promise<WebSocket>((resolve) => webSockets.once("connection", resolve));
+    webSockets.on("connection", (socket) => {
+      socket.on("message", (data) => outboundMessages.push(JSON.parse(data.toString())));
+    });
     server.on("upgrade", (request, socket, head) => {
       upgradeHeaders = request.headers;
       webSockets.handleUpgrade(request, socket, head, (webSocket) => {
@@ -48,22 +52,49 @@ describe("agent WebSocket client", () => {
       });
     });
     const port = await listen(server);
-    const onBootstrap = vi.fn();
+    let releaseBootstrap = (): void => undefined;
+    const bootstrapGate = new Promise<void>((resolve) => {
+      releaseBootstrap = resolve;
+    });
+    const onBootstrap = vi.fn(() => bootstrapGate);
+    const onBlocked = vi.fn();
     const onCommand = vi.fn();
     const client = new AgentClient({
       deploymentId: "test",
+      tenantId: "test",
       endpoint: `ws://127.0.0.1:${port}/agent/ws`,
       keyId: "current-v2",
       secret: currentSecret,
       previousKeyId: "previous-v1",
       previousSecret,
-      onBlocked: vi.fn(),
+      onBlocked,
       onBootstrap,
       onCommand
     });
 
+    const queuedStatus = {
+      type: "status" as const,
+      deployment_id: "test",
+      desired_connected: false,
+      observed_state: "DISABLED" as const,
+      gateway_connected: false,
+      voice_connected: false,
+      udp_established: false,
+      dave_established: false,
+      target_guild_id: null,
+      target_channel_id: null,
+      circuit_open: false,
+      retry_count: 0,
+      last_error_code: null,
+      last_health_at: 1
+    };
+    client.send(queuedStatus);
+    client.send({ ...queuedStatus, observed_state: "STARTING", last_health_at: 2 });
+
     await client.start();
     const socket = await connection;
+    await vi.waitFor(() => expect(outboundMessages).toHaveLength(1));
+    expect(outboundMessages[0]).toMatchObject({ observed_state: "STARTING", last_health_at: 2 });
     const timestamp = Number(requiredHeader(upgradeHeaders["x-agent-timestamp"]));
     const nonce = requiredHeader(upgradeHeaders["x-agent-nonce"]);
     const signature = requiredHeader(upgradeHeaders["x-agent-signature"]);
@@ -81,6 +112,7 @@ describe("agent WebSocket client", () => {
       JSON.stringify({
         type: "bootstrap",
         deployment_id: "test",
+        tenant_id: "test",
         desired_connected: false,
         paused: false,
         guild_configs: [],
@@ -110,12 +142,113 @@ describe("agent WebSocket client", () => {
       previousSecret
     );
     socket.send(JSON.stringify(signed));
+    await new Promise((resolve) => setTimeout(resolve, 25));
+    expect(onCommand).not.toHaveBeenCalled();
+    releaseBootstrap();
     await vi.waitFor(() => expect(onCommand).toHaveBeenCalledWith(signed, false));
     socket.send(JSON.stringify(signed));
     await vi.waitFor(() => expect(onCommand).toHaveBeenLastCalledWith(signed, true));
 
     client.close();
     socket.terminate();
+    await new Promise<void>((resolve) => webSockets.close(() => resolve()));
+    await closeServer(server);
+  });
+
+  it("rejects bootstrap state for a different tenant", async () => {
+    const server = createServer();
+    const webSockets = new WebSocketServer({ noServer: true });
+    const connection = new Promise<WebSocket>((resolve) => webSockets.once("connection", resolve));
+    server.on("upgrade", (request, socket, head) => {
+      webSockets.handleUpgrade(request, socket, head, (webSocket) => {
+        webSockets.emit("connection", webSocket, request);
+      });
+    });
+    const port = await listen(server);
+    const onBootstrap = vi.fn();
+    const onBlocked = vi.fn();
+    const client = new AgentClient({
+      deploymentId: "test",
+      tenantId: "test",
+      endpoint: `ws://127.0.0.1:${port}/agent/ws`,
+      keyId: "current-v2",
+      secret: currentSecret,
+      onBlocked,
+      onBootstrap,
+      onCommand: vi.fn()
+    });
+    await client.start();
+    const socket = await connection;
+    const closed = new Promise<number>((resolve) => socket.once("close", resolve));
+    socket.send(
+      JSON.stringify({
+        type: "bootstrap",
+        deployment_id: "test",
+        tenant_id: "another-tenant",
+        desired_connected: false,
+        paused: false,
+        guild_configs: [],
+        managed_rooms: [],
+        authorized_target: null
+      })
+    );
+    await expect(closed).resolves.toBe(1008);
+    expect(onBootstrap).not.toHaveBeenCalled();
+    expect(onBlocked).toHaveBeenCalledWith("WRONG_BOOTSTRAP_TENANT");
+    client.close();
+    await new Promise<void>((resolve) => webSockets.close(() => resolve()));
+    await closeServer(server);
+  });
+
+  it("rejects a validly signed command for a different tenant", async () => {
+    const server = createServer();
+    const webSockets = new WebSocketServer({ noServer: true });
+    const connection = new Promise<WebSocket>((resolve) => webSockets.once("connection", resolve));
+    server.on("upgrade", (request, socket, head) => {
+      webSockets.handleUpgrade(request, socket, head, (webSocket) => {
+        webSockets.emit("connection", webSocket, request);
+      });
+    });
+    const port = await listen(server);
+    const onCommand = vi.fn();
+    const onBlocked = vi.fn();
+    const client = new AgentClient({
+      deploymentId: "test",
+      tenantId: "test",
+      endpoint: `ws://127.0.0.1:${port}/agent/ws`,
+      keyId: "current-v2",
+      secret: currentSecret,
+      onBlocked,
+      onBootstrap: vi.fn(),
+      onCommand
+    });
+    await client.start();
+    const socket = await connection;
+    const now = Date.now();
+    const signed = await signCommandEnvelope(
+      {
+        version: 1,
+        command_id: crypto.randomUUID(),
+        issued_at: now,
+        expires_at: now + 30_000,
+        nonce: crypto.randomUUID(),
+        actor_user_id: "100000000000000001",
+        control_guild_id: "100000000000000002",
+        control_channel_id: "100000000000000003",
+        deployment_id: "test",
+        tenant_id: "another-tenant",
+        action: "status",
+        payload: {},
+        kid: "current-v2"
+      },
+      currentSecret
+    );
+    const closed = new Promise<number>((resolve) => socket.once("close", resolve));
+    socket.send(JSON.stringify(signed));
+    await expect(closed).resolves.toBe(1008);
+    expect(onCommand).not.toHaveBeenCalled();
+    expect(onBlocked).toHaveBeenCalledWith("WRONG_COMMAND_TENANT");
+    client.close();
     await new Promise<void>((resolve) => webSockets.close(() => resolve()));
     await closeServer(server);
   });
@@ -132,6 +265,7 @@ describe("agent WebSocket client", () => {
     });
     const client = new AgentClient({
       deploymentId: "test",
+      tenantId: "test",
       endpoint: `ws://127.0.0.1:${port}/agent/ws`,
       keyId: "current-v2",
       secret: currentSecret,

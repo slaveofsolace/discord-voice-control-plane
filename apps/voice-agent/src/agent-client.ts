@@ -25,6 +25,7 @@ export interface AgentClientOptions {
   previousKeyId?: string;
   previousSecret?: string;
   secret: string;
+  tenantId: string;
 }
 
 export class AgentClient {
@@ -33,6 +34,7 @@ export class AgentClient {
   readonly #replayGuard = new ReplayGuard();
   #closed = false;
   #blocked = false;
+  #messageQueue: Promise<void> = Promise.resolve();
   #retryCount = 0;
   #socket: WebSocket | null = null;
   #timer: NodeJS.Timeout | null = null;
@@ -64,10 +66,7 @@ export class AgentClient {
       socket.send(JSON.stringify(message));
       return;
     }
-    if (message.type !== "heartbeat") {
-      this.#outbox.push(message);
-      if (this.#outbox.length > 100) this.#outbox.shift();
-    }
+    if (message.type !== "heartbeat") this.enqueue(message);
   }
 
   private async connect(): Promise<void> {
@@ -100,7 +99,9 @@ export class AgentClient {
       this.#retryCount = 0;
       for (const message of this.#outbox.splice(0)) socket.send(JSON.stringify(message));
     });
-    socket.on("message", (data) => void this.handleMessage(data));
+    socket.on("message", (data) => {
+      this.#messageQueue = this.#messageQueue.then(() => this.handleMessage(data));
+    });
     socket.once("unexpected-response", (_request, response) => {
       response.resume();
       if (response.statusCode === 401 || response.statusCode === 403) {
@@ -125,6 +126,9 @@ export class AgentClient {
         if (bootstrap.data.deployment_id !== this.options.deploymentId) {
           throw new Error("WRONG_BOOTSTRAP_DEPLOYMENT");
         }
+        if (bootstrap.data.tenant_id !== this.options.tenantId) {
+          throw new Error("WRONG_BOOTSTRAP_TENANT");
+        }
         await this.options.onBootstrap(bootstrap.data);
         return;
       }
@@ -134,6 +138,9 @@ export class AgentClient {
       });
       if (verified.deployment_id !== this.options.deploymentId) {
         throw new Error("WRONG_COMMAND_DEPLOYMENT");
+      }
+      if (verified.tenant_id !== this.options.tenantId) {
+        throw new Error("WRONG_COMMAND_TENANT");
       }
       const existing = this.#acceptedCommands.get(verified.command_id);
       if (existing !== undefined) {
@@ -151,8 +158,10 @@ export class AgentClient {
         nonce: verified.nonce
       });
       await this.options.onCommand(verified, false);
-    } catch {
-      this.#socket?.close(1008, "invalid control message");
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "INVALID_CONTROL_MESSAGE";
+      const code = /^[A-Z\d_]{1,64}$/u.test(message) ? message : "INVALID_CONTROL_MESSAGE";
+      this.rejectControlMessage(code);
     }
   }
 
@@ -179,6 +188,46 @@ export class AgentClient {
     this.#socket?.terminate();
     this.#socket = null;
     void this.options.onBlocked(code);
+  }
+
+  private rejectControlMessage(code: string): void {
+    if (this.#blocked) return;
+    this.#blocked = true;
+    if (this.#timer !== null) clearTimeout(this.#timer);
+    this.#timer = null;
+    const socket = this.#socket;
+    this.#socket = null;
+    socket?.close(1008, "invalid control message");
+    void this.options.onBlocked(code);
+  }
+
+  private enqueue(message: AgentMessage): void {
+    const replacementKey = this.replacementKey(message);
+    if (replacementKey !== null) {
+      const existing = this.#outbox.findIndex(
+        (candidate) => this.replacementKey(candidate) === replacementKey
+      );
+      if (existing >= 0) this.#outbox.splice(existing, 1);
+    }
+    this.#outbox.push(message);
+    while (this.#outbox.length > 1_000) {
+      const replaceable = this.#outbox.findIndex(
+        (candidate) => this.replacementKey(candidate) !== null
+      );
+      this.#outbox.splice(replaceable >= 0 ? replaceable : 0, 1);
+    }
+  }
+
+  private replacementKey(message: AgentMessage): string | null {
+    if (message.type === "status") return "status";
+    if (message.type === "guild_config_event") return `guild:${message.config.guild_id}`;
+    if (message.type === "authorized_target_event") return "authorized-target";
+    if (message.type === "managed_room_event") {
+      const channelId =
+        message.operation === "upsert" ? message.room.channel_id : message.channel_id;
+      return `room:${channelId}`;
+    }
+    return null;
   }
 
   private secretsByKeyId(): ReadonlyMap<string, string> {

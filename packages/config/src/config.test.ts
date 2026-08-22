@@ -12,7 +12,8 @@ const base = {
   TARGET_APPROVER_USER_IDS: "100000000000000001",
   PREFIX_COMMANDS_ENABLED: "false",
   MESSAGE_CONTENT_INTENT_ENABLED: "false",
-  MANAGED_ROOMS_ENABLED: "false"
+  MANAGED_ROOMS_ENABLED: "false",
+  MANAGED_GUILD_IDS: "100000000000000002"
 };
 
 describe("voice environment", () => {
@@ -26,5 +27,21 @@ describe("voice environment", () => {
     expect(() =>
       voiceEnvironmentSchema.parse({ ...base, PREFIX_COMMANDS_ENABLED: "true" })
     ).toThrow("MESSAGE_CONTENT_INTENT_ENABLED");
+  });
+
+  it("requires the previous rotation key ID and secret as a pair", () => {
+    expect(() => voiceEnvironmentSchema.parse({ ...base, AGENT_PREVIOUS_KEY_ID: "v0" })).toThrow(
+      "configured together"
+    );
+    expect(() =>
+      voiceEnvironmentSchema.parse({ ...base, AGENT_PREVIOUS_AUTH_SECRET: "y".repeat(32) })
+    ).toThrow("configured together");
+    expect(
+      voiceEnvironmentSchema.parse({
+        ...base,
+        AGENT_PREVIOUS_KEY_ID: "v0",
+        AGENT_PREVIOUS_AUTH_SECRET: "y".repeat(32)
+      })
+    ).toMatchObject({ AGENT_PREVIOUS_KEY_ID: "v0" });
   });
 });

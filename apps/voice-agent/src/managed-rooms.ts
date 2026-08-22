@@ -21,6 +21,8 @@ const deletionGraceMs = 15_000;
 
 export interface ManagedRoomServiceOptions {
   deploymentId: string;
+  managedGuildIds: ReadonlySet<string>;
+  managedRoomsEnabled: boolean;
   onEvent: (event: AgentMessage) => void;
   prefixCommandsEnabled: boolean;
   targetApproverUserIds: ReadonlySet<string>;
@@ -41,6 +43,8 @@ export class ManagedRoomService {
   constructor(private readonly options: ManagedRoomServiceOptions) {}
 
   applyBootstrap(bootstrap: AgentBootstrap): void {
+    for (const timer of this.#deletionTimers.values()) clearTimeout(timer);
+    this.#deletionTimers.clear();
     this.#configs.clear();
     this.#rooms.clear();
     for (const config of bootstrap.guild_configs) this.#configs.set(config.guild_id, config);
@@ -53,7 +57,14 @@ export class ManagedRoomService {
 
   async setup(guild: Guild, actor: GuildMember): Promise<GuildConfigRecord> {
     this.requireAdministrator(actor);
+    if (!this.options.managedRoomsEnabled) {
+      throw new Error("MANAGED_ROOMS_DISABLED_BY_DEPLOYMENT");
+    }
     let config = this.#configs.get(guild.id);
+    if (config?.feature_profile === "presence_only") throw new Error("PRESENCE_ONLY_PROFILE");
+    if (!this.options.managedGuildIds.has(guild.id)) {
+      throw new Error("MANAGED_GUILD_NOT_AUTHORIZED");
+    }
     let category = config?.category_id ? guild.channels.cache.get(config.category_id) : undefined;
     if (category?.type !== ChannelType.GuildCategory) {
       category = await guild.channels.create({
@@ -103,6 +114,7 @@ export class ManagedRoomService {
     if (config === undefined) return "Managed rooms are not configured.";
     const roomCount = [...this.#rooms.values()].filter((room) => room.guild_id === guildId).length;
     return [
+      `Profile: ${config.feature_profile}`,
       `Enabled: ${config.managed_rooms_enabled ? "yes" : "no"}`,
       `Category: ${config.category_id ?? "missing"}`,
       `Lobby: ${config.lobby_channel_id ?? "missing"}`,
@@ -116,6 +128,13 @@ export class ManagedRoomService {
     this.requireAdministrator(actor);
     const config = this.#configs.get(guild.id);
     if (config === undefined) throw new Error("RUN_VOICE_ADMIN_SETUP_FIRST");
+    if (config.feature_profile !== "managed_rooms") throw new Error("PRESENCE_ONLY_PROFILE");
+    if (!this.options.managedGuildIds.has(guild.id)) {
+      throw new Error("MANAGED_GUILD_NOT_AUTHORIZED");
+    }
+    if (enabled && !this.options.managedRoomsEnabled) {
+      throw new Error("MANAGED_ROOMS_DISABLED_BY_DEPLOYMENT");
+    }
     const updated = { ...config, managed_rooms_enabled: enabled };
     this.storeConfig(updated);
     return updated;
@@ -128,6 +147,19 @@ export class ManagedRoomService {
     if (!permitted) throw new Error("TARGET_APPROVER_REQUIRED");
     if (channel.guildId !== guild.id || channel.type !== ChannelType.GuildVoice) {
       throw new Error("GUILD_VOICE_CHANNEL_REQUIRED");
+    }
+    if (!this.#configs.has(guild.id)) {
+      const managedProfile = this.options.managedGuildIds.has(guild.id);
+      this.storeConfig({
+        deployment_id: this.options.deploymentId,
+        guild_id: guild.id,
+        feature_profile: managedProfile ? "managed_rooms" : "presence_only",
+        managed_rooms_enabled: false,
+        prefix_commands_enabled: managedProfile && this.options.prefixCommandsEnabled,
+        category_id: null,
+        lobby_channel_id: null,
+        command_channel_id: null
+      });
     }
     this.options.onEvent({
       type: "authorized_target_event",
@@ -160,6 +192,18 @@ export class ManagedRoomService {
       const timer = this.#deletionTimers.get(newState.channelId);
       if (timer !== undefined) clearTimeout(timer);
       this.#deletionTimers.delete(newState.channelId);
+    }
+  }
+
+  async reconcileGuild(guild: Guild): Promise<void> {
+    const rooms = [...this.#rooms.values()].filter((room) => room.guild_id === guild.id);
+    for (const room of rooms) {
+      const channel = await guild.channels.fetch(room.channel_id).catch(() => null);
+      if (channel?.type !== ChannelType.GuildVoice) {
+        this.handleChannelDelete(room.channel_id, guild.id);
+        continue;
+      }
+      this.scheduleDeleteIfEmpty(room.channel_id, guild, channel);
     }
   }
 
@@ -300,9 +344,9 @@ export class ManagedRoomService {
     }
   }
 
-  private scheduleDeleteIfEmpty(channelId: string, guild: Guild): void {
+  private scheduleDeleteIfEmpty(channelId: string, guild: Guild, fetched?: VoiceChannel): void {
     if (this.#deletionTimers.has(channelId)) return;
-    const channel = guild.channels.cache.get(channelId);
+    const channel = fetched ?? guild.channels.cache.get(channelId);
     if (channel?.type !== ChannelType.GuildVoice || this.hasHuman(channel)) return;
     const timer = setTimeout(() => {
       this.#deletionTimers.delete(channelId);
@@ -332,6 +376,12 @@ export class ManagedRoomService {
     userId?: string
   ): Promise<void> {
     if (userId === undefined) throw new Error("USER_REQUIRED");
+    if (
+      !room.settings.permitted_user_ids.includes(userId) &&
+      room.settings.permitted_user_ids.length >= 100
+    ) {
+      throw new Error("PERMITTED_USER_LIMIT_REACHED");
+    }
     await channel.permissionOverwrites.edit(userId, { Connect: true });
     room.settings.banned_user_ids = room.settings.banned_user_ids.filter((id) => id !== userId);
     if (!room.settings.permitted_user_ids.includes(userId))
@@ -366,6 +416,12 @@ export class ManagedRoomService {
     userId?: string
   ): Promise<void> {
     if (userId === undefined || userId === actor.id) throw new Error("VALID_OTHER_USER_REQUIRED");
+    if (
+      !room.settings.banned_user_ids.includes(userId) &&
+      room.settings.banned_user_ids.length >= 100
+    ) {
+      throw new Error("BANNED_USER_LIMIT_REACHED");
+    }
     await channel.permissionOverwrites.edit(userId, { Connect: false });
     room.settings.permitted_user_ids = room.settings.permitted_user_ids.filter(
       (id) => id !== userId

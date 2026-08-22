@@ -8,6 +8,7 @@ interface Env {
   PREFIX_COMMANDS_ENABLED: string;
   MESSAGE_CONTENT_INTENT_ENABLED: string;
   MANAGED_ROOMS_ENABLED: string;
+  MANAGED_GUILD_IDS: string;
   TARGET_APPROVER_USER_IDS: string;
   AGENT_KEY_ID: string;
   AGENT_PREVIOUS_KEY_ID?: string;
@@ -26,6 +27,7 @@ interface AgentStartConfiguration {
   botToken: string;
   deploymentId: string;
   managedRoomsEnabled: string;
+  managedGuildIds: string;
   messageContentIntentEnabled: string;
   prefixCommandsEnabled: string;
   targetApproverUserIds: string;
@@ -61,6 +63,7 @@ export class VoiceAgentContainer extends Container<Env> {
       DEPLOYMENT_ID: configuration.deploymentId,
       DISCORD_BOT_TOKEN: configuration.botToken,
       MANAGED_ROOMS_ENABLED: configuration.managedRoomsEnabled,
+      MANAGED_GUILD_IDS: configuration.managedGuildIds,
       MESSAGE_CONTENT_INTENT_ENABLED: configuration.messageContentIntentEnabled,
       PORT: "8080",
       PREFIX_COMMANDS_ENABLED: configuration.prefixCommandsEnabled,
@@ -128,6 +131,7 @@ function startupConfiguration(env: Env): AgentStartConfiguration {
     botToken: env.DISCORD_BOT_TOKEN,
     deploymentId: env.DEPLOYMENT_ID,
     managedRoomsEnabled: env.MANAGED_ROOMS_ENABLED,
+    managedGuildIds: env.MANAGED_GUILD_IDS,
     messageContentIntentEnabled: env.MESSAGE_CONTENT_INTENT_ENABLED,
     prefixCommandsEnabled: env.PREFIX_COMMANDS_ENABLED,
     targetApproverUserIds: env.TARGET_APPROVER_USER_IDS,
