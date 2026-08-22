@@ -4,7 +4,7 @@ Do not open a public issue containing a Discord token, client secret, Cloudflare
 
 Report a suspected vulnerability privately through GitHub's security advisory flow for this repository. Include affected commit, preconditions, impact, and a minimal reproduction with dummy identifiers.
 
-Supported code is the latest commit on `main`. The initial implementation branch is under review and has no live-service support claim.
+Supported code is the latest commit on `main`. Publication on `main` does not imply that Discord or Cloudflare live gates have passed; consult `docs/TEST_EVIDENCE.md` for the current evidence boundary.
 
 If a credential may have leaked:
 

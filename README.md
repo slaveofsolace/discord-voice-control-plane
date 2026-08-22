@@ -1,12 +1,14 @@
 # Discord Voice Control Plane
 
-An official Discord bot and Cloudflare control plane for authorized voice-channel presence, managed temporary rooms, safe text relay, and operator diagnostics.
+Authorized Discord voice presence, managed temporary rooms, and operator controls with a Cloudflare-backed control plane.
 
-This repository does not automate user accounts. It does not send synthetic audio, messages, reactions, or presence changes to defeat inactivity rules. A target guild must install the official bot and approve its behavior.
+The project uses two Discord applications: an interaction-only `VC Control` app and an official `Voice Rooms` bot. It does not automate user accounts, receive or emit audio, or generate activity to defeat another bot's inactivity policy. A target guild must install the bot and approve the exact test boundary.
 
 ## Current status
 
-The implementation passes the recorded local build, unit, Workers integration, wording, secret, and dependency gates. Discord and Cloudflare live behavior is not yet verified. The Socialize path is **BLOCKED** until staff supplies an approval reference, an approved test window, and the exact target channel. See `docs/TEST_EVIDENCE.md` for the evidence boundary.
+The source passes its clean local verification and GitHub Actions gates: 77 package tests, 13 migration-backed Workers tests, strict type checking, all workspace builds, wording checks, secret scanning, dependency audit, Worker bundle dry-runs, and both Container image builds in CI.
+
+Discord and Cloudflare runtime behavior is not yet verified. Cloudflare voice hosting is **BLOCKED** until Workers Paid enables Container access. The Socialize path is **BLOCKED** until staff supplies an approval reference, approved window, approved application and guild IDs, and the exact temporary voice channel. [Test evidence](docs/TEST_EVIDENCE.md) keeps those live claims separate from local and CI results.
 
 ## Services
 
@@ -14,6 +16,8 @@ The implementation passes the recorded local build, unit, Workers integration, w
 - `apps/voice-host-worker`: private Cloudflare Container lifecycle controller.
 - `apps/voice-agent`: Discord Gateway, voice connection, managed rooms, member commands, and safe relay.
 - `spikes/cloudflare-voice-probe`: isolated UDP, Gateway, DAVE, restart, and lifecycle proof.
+
+The control and voice planes share versioned contracts but not the Discord bot token. The control Worker cannot connect to Discord's Gateway. The private voice host is the only Cloudflare Worker designed to receive the Voice Rooms token.
 
 The public template starts with prefix commands and managed rooms disabled. Slash commands do not need Message Content. A deployment that enables `!voice` or `!v` must also enable Discord's Message Content privileged intent.
 
@@ -41,7 +45,7 @@ pnpm verify
 
 Copy `.env.example` to a local secret file that is excluded by `.gitignore`. Do not put a Discord token or Cloudflare credential in tracked files.
 
-Deployment is intentionally gated. Read `docs/DEPLOYMENT.md`, `docs/BOT_PERMISSIONS.md`, and `docs/RUNBOOK.md` before connecting an application to a guild.
+Deployment is intentionally gated. Read [Deployment](docs/DEPLOYMENT.md), [Bot permissions](docs/BOT_PERMISSIONS.md), and the [Runbook](docs/RUNBOOK.md) before connecting an application to a guild.
 
 ## Scope
 
@@ -49,6 +53,17 @@ V1 runs one tenant and one deployment while keeping `tenant_id` and `deployment_
 
 The bot never subscribes to voice receivers, records or transcribes audio, emits audio, impersonates users, or sends activity intended to defeat another bot's deletion rules.
 
+## Documentation
+
+- [Architecture](docs/ARCHITECTURE.md)
+- [Hosting decision](docs/ADR-001-voice-agent-hosting.md)
+- [Threat model](docs/THREAT_MODEL.md)
+- [Privacy](docs/PRIVACY.md)
+- [Commands](docs/COMMANDS.md)
+- [Deployment](docs/DEPLOYMENT.md)
+- [Runbook](docs/RUNBOOK.md)
+- [Final evidence report](docs/FINAL_REPORT.md)
+
 ## License
 
-MIT
+[MIT](LICENSE)

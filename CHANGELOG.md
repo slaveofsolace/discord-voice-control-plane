@@ -8,5 +8,9 @@
 - Added signed control envelopes, replay protection, 24-hour receipts, redacted 30-day audit records, heartbeats, and circuit-breaking state transitions.
 - Added a private Cloudflare Container host, an evidence-gated voice probe, and a Docker Compose/systemd fallback adapter.
 - Added the reusable `authorized-discord-bot-ops` skill, local checks, CI, deployment scripts, and operator documentation.
+- Enforced tenant and deployment isolation at the control, Durable Object, bootstrap, command, and heartbeat boundaries.
+- Added ordered Durable Object state recovery, bounded agent offline recovery, daily audit retention, managed-guild allowlisting, and restart-safe empty-room cleanup.
+- Made Discord voice readiness depend on DAVE observation and added controlled voice rejoin, Gateway reauthentication, two-run Container lifecycle, and clean SIGTERM evidence gates.
+- Made relay delivery idempotent through Discord's enforced message nonce and tightened initial D1 provisioning, secret rotation, and deployment-variable handling.
 
 No Discord or Cloudflare live verification is claimed by this entry.

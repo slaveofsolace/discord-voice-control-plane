@@ -1,18 +1,18 @@
 # Caffeine checkpoint
 
 - Objective: build, verify, deploy, document, and publish the authorized Discord voice control plane and managed-room bot.
-- Completion gates: local static/tests; private Discord proof; Cloudflare UDP/DAVE/lifecycle proof; sanitized public branch/PR; Socialize verified or exact blocker.
-- Root / branch / review: `C:\AI Projects\discord-voice-control-plane`; `sol/initial-build`; public draft PR <https://github.com/slaveofsolace/discord-voice-control-plane/pull/1>; baseline `cbffafa8d46bc88f4f1a3d09e44ab6d718cd8869`.
+- Completion gates: local static/tests; private Discord proof; Cloudflare UDP/DAVE/lifecycle proof; sanitized public `main`; Socialize verified or exact blocker.
+- Root / publication: `C:\AI Projects\discord-voice-control-plane`; public repository <https://github.com/slaveofsolace/discord-voice-control-plane>; authoritative branch `main`; initial review retained in pull request #1.
 - Dirty ownership: all changes in this new repository belong to this task.
 - Protected root: `C:\Users\suhai\Documents\SOL Tools` is user-owned, dirty, and read-only for this task.
-- Invariants: official bot only; no synthetic activity; no raw voice collection; no secrets in files/logs; no billing automation; no PR merge.
-- Published implementation checkpoint: `59f0c4b5e3406cecc9715e017f83e067377a5a34`; resolve the later evidence-only commit from the draft PR head when resuming.
-- Last verified checkpoint: clean-build format, typed lint, strict typecheck, eight builds, 62 package tests, 9 migration-backed Workers tests, copy triage, secret scan, dependency audit, and all three Worker bundle dry-runs pass locally. Both GitHub Actions runs passed, including both Docker image builds. Container execution remains unavailable on this machine.
+- Invariants: official bot only; no synthetic activity; no raw voice collection; no secrets in files/logs; no billing automation; no target action without exact staff authority.
+- User decision: publish completed commits on `main`. A temporary task branch is allowed only for review history and is deleted after a verified fast-forward; unrelated refs are not deleted by inference.
+- Verified implementation checkpoint before the final documentation commit: `180abd0594980d0dbcaeddfa5cab53914bb54016`.
+- Last local checkpoint: clean-build format, typed lint, strict typecheck, eight builds, 77 package tests, 13 migration-backed Workers tests, copy triage, secret scan, dependency audit, and all three Worker bundle dry-runs passed. Both matching GitHub Actions runs passed, including both Docker image builds. Container execution remains unavailable on this machine.
 - Evidence paths: `docs/evidence/reasoning-ledger.json`, `docs/TEST_EVIDENCE.md`, `docs/FINAL_REPORT.md`, ignored `.runtime/` logs.
-- Active decision: implementation and publication are complete; credential-gated work stays unclaimed until observed.
-- Current atomic action: commit this sanitized final report, push it, verify CI and the clean tree, and leave the PR draft.
-- Progress signal: 62/62 package tests, 9/9 Workers integration tests, two green CI runs, both image builds passed, and no known dependency vulnerability.
-- Retry count / strategy change: PowerShell bridge avoided; direct `cmd.exe` and bundled runtimes are authoritative. Computer use stopped after its one authorized retry failed before window discovery.
-- Next action after evidence publication: the user manually enables Workers Paid and confirms completion without sharing billing information.
-- Pending gates and nonclaims: Discord apps/guild, live Gateway/UDP/DAVE, Cloudflare deployment, and private command behavior are unverified. Cloudflare Containers are blocked on Workers Paid. Socialize is blocked on staff approval, an approved window, approved IDs, and the exact target.
-- REBOOT-SAFE: YES — root, branch, baseline, invariants, review URL, and resume action are recorded.
+- Active decision: finish wording and repository metadata, verify the final commit, fast-forward `main`, wait for main CI, and delete the redundant task branch.
+- Progress signal: 77/77 package tests, 13/13 Workers integration tests, two green CI runs at the hardened implementation checkpoint, both image builds passed, and no known dependency vulnerability.
+- Retry count / strategy change: the stalled PowerShell bridge is avoided; direct `cmd.exe` and bundled runtimes are authoritative. Computer use stopped after its one authorized retry failed before window discovery.
+- Pending gates and nonclaims: Discord apps/guild, live Gateway/UDP/DAVE, Cloudflare deployment, private command behavior, rollback, and token/key rotation are unverified. Cloudflare Containers are blocked on Workers Paid. Socialize is blocked on staff approval, an approved window, approved IDs, operator/removal contacts, and the exact target.
+- Next external action: the user manually enables Workers Paid and confirms completion without sharing billing information.
+- REBOOT-SAFE: YES — root, main-branch decision, implementation checkpoint, invariants, repository URL, evidence, blockers, and resume action are recorded.

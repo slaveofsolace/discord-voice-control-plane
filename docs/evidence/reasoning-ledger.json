@@ -3,7 +3,7 @@
   "ledger_id": "discord_voice_control",
   "created_at": "2026-08-21T23:00:00-05:00",
   "depth": "DEEP",
-  "iteration": 2,
+  "iteration": 3,
   "root": {
     "kind": "DECISION",
     "node_id": "root_node",
@@ -52,7 +52,7 @@
         "unknown_disposition": "Container UDP, DAVE, and lifecycle behavior require live proof."
       },
       "current_state_history": {
-        "summary": "The implementation is locally verified on sol/initial-build from baseline cbffafa; Node 24.19 and pnpm 11.19 are pinned; SOL Tools remained dirty and protected.",
+        "summary": "The hardened implementation is locally verified for publication on main; Node 24.19 and pnpm 11.19 are pinned; SOL Tools remained dirty and protected.",
         "knowledge": "KNOWN",
         "load_bearing": true,
         "claim_ids": ["claim_unknown"],
@@ -87,11 +87,11 @@
     "stakeholders": []
   },
   "authority": {
-    "scope": "Build, test, publish, and deploy the requested official-bot system; live credentials, billing, target permissions, and merge remain human-reserved.",
+    "scope": "Build, test, publish to main, and deploy the requested official-bot system; live credentials, billing, and target permissions remain human-reserved.",
     "decision_owner": "Repository owner for implementation; target-guild staff for Socialize actions",
     "authorized_actions": [
       "Create and modify the isolated repository.",
-      "Create the public GitHub repository, push the implementation branch, and open a draft pull request.",
+      "Create the public GitHub repository, retain review history, publish verified commits to main, and delete the redundant task branch after exact ref checks.",
       "Deploy to the selected Cloudflare account after the user enables the required paid plan.",
       "Perform ordinary authorized Discord UI setup while respecting confirmation gates."
     ],
@@ -99,10 +99,10 @@
       "Automate a normal Discord user account or use a user token.",
       "Generate synthetic activity or bypass inactivity policy.",
       "Expose secrets or change billing, security prompts, or target permissions for the user.",
-      "Merge the pull request without separate authorization."
+      "Delete a branch that has not been proved redundant with main or is unrelated to this task."
     ],
     "human_reserved_decisions": [
-      "Cloudflare Workers Paid enrollment, Discord credential creation or revelation, permission confirmation, Socialize installation approval, and pull-request merge."
+      "Cloudflare Workers Paid enrollment, Discord credential creation or revelation, permission confirmation, and Socialize installation approval."
     ],
     "external_state_allowed": true,
     "hard_gates": [
@@ -131,7 +131,7 @@
         "id": "gate_external",
         "category": "IRREVERSIBLE_EXTERNAL_STATE",
         "status": "CLEAR",
-        "rationale": "GitHub publication and Cloudflare deployment are authorized; merge, billing, credentials, and target permissions remain gated.",
+        "rationale": "GitHub publication on main and Cloudflare deployment are authorized; billing, credentials, target permissions, and unrelated branch deletion remain gated.",
         "claim_ids": ["claim_unknown"]
       },
       {
@@ -145,7 +145,7 @@
         "id": "gate_human",
         "category": "HUMAN_RESERVED",
         "status": "CLEAR",
-        "rationale": "Billing, credential exposure, permissions, Socialize approval, merge, and subjective acceptance have named human owners.",
+        "rationale": "Billing, credential exposure, permissions, Socialize approval, and subjective acceptance have named human owners.",
         "claim_ids": ["claim_unknown"]
       },
       {
@@ -201,7 +201,7 @@
     {
       "id": "claim_objective",
       "label": "MEASURED",
-      "statement": "The isolated repository implementation and its local verification gates are complete; publication and credential-gated live proof are the remaining actions.",
+      "statement": "The isolated repository implementation and its local verification gates are complete; main publication is authorized and credential-gated live proof remains external.",
       "evidence_ids": ["ev_user_plan", "ev_local_verify"],
       "contradiction_claim_ids": [],
       "confidence": {
@@ -238,7 +238,7 @@
       "access": "GENERATED_CURRENT",
       "locator": "docs/TEST_EVIDENCE.md",
       "captured_at": "2026-08-21T22:22:00-05:00",
-      "integrity": "Sanitized summary of frozen install, formatting, lint, typecheck, builds, 62 package tests, 9 Workers tests, wording, secret, dependency, skill, and deploy-bundle checks.",
+      "integrity": "Sanitized summary of frozen install, formatting, lint, typecheck, builds, 77 package tests, 13 Workers tests, wording, secret, dependency, skill, and deploy-bundle checks.",
       "supports_claim_ids": ["claim_objective"],
       "contradicts_claim_ids": []
     },
@@ -288,7 +288,7 @@
   },
   "decision": {
     "iteration_choice": "ESCALATE",
-    "recommendation": "Publish the verified branch through a draft pull request, then hand the named billing, Discord credential, permission, and Socialize authorization gates to their human owners.",
+    "recommendation": "Fast-forward the verified implementation to main, remove only the redundant task branch, then hand the named billing, Discord credential, permission, and Socialize authorization gates to their human owners.",
     "selected_action_ids": [],
     "rejected_options": [
       "Do not begin with Socialize or a production voice connection before private-guild and hosting proof."
@@ -328,7 +328,7 @@
   },
   "closure": {
     "status": "OPEN",
-    "summary": "Local implementation and verification are complete. Publication is in progress; Discord, Cloudflare Container, private-guild, and Socialize evidence remain open or externally blocked.",
+    "summary": "Local implementation and verification are complete and main publication is authorized. Discord, Cloudflare Container, private-guild, and Socialize evidence remain open or externally blocked.",
     "residual_risks": [
       "Cloudflare Containers may fail a live UDP, DAVE, native-library, or lifecycle gate.",
       "Socialize may not approve installation or a supported retention mechanism."
