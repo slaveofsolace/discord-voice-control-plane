@@ -1,0 +1,28 @@
+{
+  "name": "@discord-vc-control/voice-agent",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./dist/index.js"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "clean": "node ../../scripts/clean-dist.mjs apps/voice-agent",
+    "start": "node --enable-source-maps dist/index.js",
+    "dev": "tsx src/index.ts"
+  },
+  "dependencies": {
+    "@discord-vc-control/config": "workspace:*",
+    "@discord-vc-control/contracts": "workspace:*",
+    "@discord-vc-control/security": "workspace:*",
+    "@discordjs/voice": "0.19.2",
+    "discord.js": "14.27.0",
+    "ws": "8.21.3",
+    "zod": "4.4.3"
+  },
+  "devDependencies": {
+    "@types/ws": "8.18.1"
+  }
+}

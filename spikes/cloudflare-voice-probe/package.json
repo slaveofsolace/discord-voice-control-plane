@@ -1,0 +1,21 @@
+{
+  "name": "@discord-vc-control/cloudflare-voice-probe",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "clean": "node ../../scripts/clean-dist.mjs spikes/cloudflare-voice-probe",
+    "start": "node --enable-source-maps dist/probe.js"
+  },
+  "dependencies": {
+    "@cloudflare/containers": "0.3.7",
+    "@discordjs/voice": "0.19.2",
+    "discord.js": "14.27.0",
+    "ws": "8.21.3"
+  },
+  "devDependencies": {
+    "@types/ws": "8.18.1"
+  }
+}

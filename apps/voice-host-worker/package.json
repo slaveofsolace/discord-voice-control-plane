@@ -1,0 +1,14 @@
+{
+  "name": "@discord-vc-control/voice-host-worker",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "clean": "node ../../scripts/clean-dist.mjs apps/voice-host-worker"
+  },
+  "dependencies": {
+    "@cloudflare/containers": "0.3.7"
+  }
+}

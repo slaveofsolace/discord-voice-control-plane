@@ -1,0 +1,17 @@
+[Unit]
+Description=Authorized Discord voice agent
+Requires=docker.service
+After=docker.service network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+WorkingDirectory=/opt/discord-voice-control-plane/deploy
+ExecStart=/usr/bin/docker compose -f docker-compose.yml up --detach --no-build voice-agent
+ExecStop=/usr/bin/docker compose -f docker-compose.yml stop --timeout 30 voice-agent
+TimeoutStartSec=120
+TimeoutStopSec=45
+
+[Install]
+WantedBy=multi-user.target

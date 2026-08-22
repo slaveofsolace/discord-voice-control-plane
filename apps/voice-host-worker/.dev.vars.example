@@ -1,0 +1,5 @@
+DISCORD_BOT_TOKEN=replace-through-a-protected-secret-prompt
+CONTROL_AGENT_WS_URL=wss://replace.example/agent/ws
+AGENT_AUTH_SECRET=replace-with-at-least-32-random-characters
+AGENT_PREVIOUS_AUTH_SECRET=
+AGENT_PREVIOUS_KEY_ID=

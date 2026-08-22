@@ -1,0 +1,18 @@
+FROM node:24.19.0-bookworm-slim@sha256:3638d9a6fe4030bd716be989438248074489337ba3275657f93595428be4fc03
+
+ENV NODE_ENV=production
+WORKDIR /app
+
+RUN groupadd --system --gid 10001 voiceprobe \
+  && useradd --system --uid 10001 --gid voiceprobe --home-dir /app voiceprobe
+
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+COPY spikes/cloudflare-voice-probe/package.json spikes/cloudflare-voice-probe/package.json
+RUN corepack enable \
+  && pnpm install --frozen-lockfile --prod --filter @discord-vc-control/cloudflare-voice-probe
+
+COPY spikes/cloudflare-voice-probe/dist spikes/cloudflare-voice-probe/dist
+
+USER voiceprobe
+EXPOSE 8080
+CMD ["node", "--enable-source-maps", "spikes/cloudflare-voice-probe/dist/probe.js"]

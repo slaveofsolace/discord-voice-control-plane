@@ -1,0 +1,46 @@
+{
+  "$schema": "../../node_modules/wrangler/config-schema.json",
+  "name": "discord-vc-voice-host",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-08-21",
+  "workers_dev": false,
+  "observability": {
+    "enabled": true,
+    "head_sampling_rate": 1
+  },
+  "containers": [
+    {
+      "class_name": "VoiceAgentContainer",
+      "image": "../../Dockerfile.voice-agent",
+      "instance_type": "lite",
+      "max_instances": 1
+    }
+  ],
+  "durable_objects": {
+    "bindings": [
+      {
+        "name": "VOICE_AGENT_CONTAINER",
+        "class_name": "VoiceAgentContainer"
+      }
+    ]
+  },
+  "migrations": [
+    {
+      "tag": "v1",
+      "new_sqlite_classes": ["VoiceAgentContainer"]
+    }
+  ],
+  "triggers": {
+    "crons": ["* * * * *"]
+  },
+  "vars": {
+    "DEPLOYMENT_ID": "local",
+    "TENANT_ID": "local",
+    "HOST_ENABLED": "false",
+    "PREFIX_COMMANDS_ENABLED": "false",
+    "MESSAGE_CONTENT_INTENT_ENABLED": "false",
+    "MANAGED_ROOMS_ENABLED": "false",
+    "TARGET_APPROVER_USER_IDS": "",
+    "AGENT_KEY_ID": "local-v1"
+  }
+}
