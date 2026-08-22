@@ -8,7 +8,7 @@ The project uses two Discord applications: an interaction-only `VC Control` app 
 
 The source passes its clean local verification and GitHub Actions gates: 77 package tests, 13 migration-backed Workers tests, strict type checking, all workspace builds, wording checks, secret scanning, dependency audit, Worker bundle dry-runs, and both Container image builds in CI.
 
-Discord and Cloudflare runtime behavior is not yet verified. Cloudflare voice hosting is **BLOCKED** until the owner selects the intended account and Workers Paid enables Container access. The Socialize path is **BLOCKED** until staff supplies an approval reference, approved window, approved application and guild IDs, and the exact temporary voice channel. [Test evidence](docs/TEST_EVIDENCE.md) keeps those live claims separate from local and CI results.
+Discord and Cloudflare runtime behavior is not yet verified. The private `VC Control Lab` server and its `voice-control` and `voice-probe` channels now exist, but neither application identity, credential path, permission grant, command path, nor voice connection has been exercised. The intended personal Cloudflare account is selected; Cloudflare voice hosting is **BLOCKED** until the owner authorizes and completes the Workers Paid upgrade. The Socialize path is **BLOCKED** until staff supplies an approval reference, approved window, approved application and guild IDs, and the exact temporary voice channel. [Test evidence](docs/TEST_EVIDENCE.md) keeps those live claims separate from local and CI results.
 
 ## Services
 

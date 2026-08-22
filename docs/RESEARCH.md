@@ -1,6 +1,6 @@
 # Research record
 
-Checked on 2026-08-21.
+Checked on 2026-08-22.
 
 ## Discord
 
@@ -21,9 +21,9 @@ Checked on 2026-08-21.
 
 ## Unresolved live facts
 
-- A prior selected-account check reported that Workers Paid was not enabled. The latest non-interactive check found two available accounts and no configured selection. Container deployment is `BLOCKED` until the user chooses the intended account locally and enables Workers Paid there if still required.
+- Authorized browser UI selected the intended personal Cloudflare account and showed Free as the current Workers plan. Container deployment is `BLOCKED` until the owner authorizes and completes Workers Paid.
 - A read-only `wrangler containers list` check against the selected personal account returned: `Unauthorized: You do not have access to Cloudflare Containers. Deploying containers requires the Workers Paid plan.` No account ID is stored in this repository.
-- The authorized Computer helper recheck failed before window discovery with `failed to write kernel assets: The system cannot find the path specified. (os error 3)`. Discord portal steps therefore require the manual path described in `DEPLOYMENT.md` unless the helper is repaired outside this repository.
-- The two Discord applications and `VC Control Lab` have not been created or inspected.
+- The updated authorized Computer component is functional. Authenticated live UI created the private `VC Control Lab` server, `voice-control`, and `voice-probe` without creating an invite or adding another member.
+- `VC Control` is prefilled in Discord's new-application dialog. Neither Discord application identity has been created, and no client secret, bot token, privileged intent, installation grant, registered command, Gateway session, or voice session has been observed.
 - No Discord Gateway, UDP discovery, DAVE session, test-guild command, or Socialize result has been observed.
 - Socialize is `BLOCKED` because staff approval, an approved window, approved application and bot IDs, guild ID, and exact target ID have not been supplied. Deletion behavior remains `UNVERIFIED` until an authorized live observation.

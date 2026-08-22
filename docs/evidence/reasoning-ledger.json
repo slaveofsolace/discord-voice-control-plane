@@ -3,7 +3,7 @@
   "ledger_id": "discord_voice_control",
   "created_at": "2026-08-21T23:00:00-05:00",
   "depth": "DEEP",
-  "iteration": 4,
+  "iteration": 5,
   "root": {
     "kind": "DECISION",
     "node_id": "root_node",
@@ -52,10 +52,10 @@
         "unknown_disposition": "Container UDP, DAVE, and lifecycle behavior require live proof."
       },
       "current_state_history": {
-        "summary": "The hardened implementation is published on a clean main-only remote at checkpoint 0f52c53; main CI, 77 package tests, and 13 Workers tests pass; SOL Tools remained dirty and protected.",
+        "summary": "The hardened implementation is published on a clean main-only remote at checkpoint ce973bb; the private VC Control Lab server and requested channels now exist; both Discord applications and every live runtime gate remain open; SOL Tools remained dirty and protected.",
         "knowledge": "KNOWN",
         "load_bearing": true,
-        "claim_ids": ["claim_unknown"],
+        "claim_ids": ["claim_live_setup", "claim_unknown"],
         "unknown_disposition": "Recheck branch, HEAD, credentials, account plan, and live app state before external actions."
       },
       "people_incentives": {
@@ -210,14 +210,25 @@
       }
     },
     {
+      "id": "claim_live_setup",
+      "label": "OBSERVED",
+      "statement": "Authenticated live UI created VC Control Lab with voice-control and voice-probe and selected the intended personal Cloudflare account; no Discord application identity, credential, grant, paid subscription, or deployment was created.",
+      "evidence_ids": ["ev_live_setup", "ev_cloudflare_blocker"],
+      "contradiction_claim_ids": [],
+      "confidence": {
+        "level": "HIGH",
+        "basis": "The current authenticated Discord and Cloudflare UI states were inspected after each bounded action, with identifiers, credentials, and billing data excluded from committed evidence."
+      }
+    },
+    {
       "id": "claim_unknown",
       "label": "UNKNOWN",
-      "statement": "Cloudflare account selection and paid-plan state, live Discord credentials and private-guild behavior, Container UDP and DAVE lifecycle behavior, rollback, and Socialize retention remain unresolved.",
-      "evidence_ids": ["ev_cloudflare_blocker", "ev_computer_blocker", "ev_runtime_prerequisites"],
+      "statement": "Workers Paid enrollment, both Discord application identities and protected grants, private-guild behavior, Container UDP and DAVE lifecycle behavior, rollback, and Socialize retention remain unresolved.",
+      "evidence_ids": ["ev_cloudflare_blocker", "ev_live_setup", "ev_runtime_prerequisites"],
       "contradiction_claim_ids": [],
       "confidence": {
         "level": "LOW",
-        "basis": "No live-guild or deployed Container evidence exists yet."
+        "basis": "No live Discord application, command, voice, or deployed Container evidence exists yet."
       }
     }
   ],
@@ -247,19 +258,19 @@
       "kind": "LOG",
       "access": "INSPECTED_CURRENT",
       "locator": "docs/RESEARCH.md#unresolved-live-facts",
-      "captured_at": "2026-08-21T23:50:00-05:00",
-      "integrity": "Sanitized Wrangler evidence: a prior selected account required Workers Paid, while the current non-interactive check found two accounts and no configured selection; account identifiers and raw logs are excluded.",
-      "supports_claim_ids": ["claim_unknown"],
+      "captured_at": "2026-08-22T01:10:35-05:00",
+      "integrity": "Sanitized current UI and prior Wrangler evidence: the personal account is selected, Free is current, and Containers require Workers Paid; account identifiers, billing data, and raw logs are excluded.",
+      "supports_claim_ids": ["claim_live_setup", "claim_unknown"],
       "contradicts_claim_ids": []
     },
     {
-      "id": "ev_computer_blocker",
-      "kind": "LOG",
+      "id": "ev_live_setup",
+      "kind": "MEASUREMENT",
       "access": "INSPECTED_CURRENT",
-      "locator": "docs/RESEARCH.md#unresolved-live-facts",
-      "captured_at": "2026-08-21T22:22:00-05:00",
-      "integrity": "Exact pre-window-discovery helper error retained without credentials or screenshots.",
-      "supports_claim_ids": ["claim_unknown"],
+      "locator": "docs/TEST_EVIDENCE.md#current-checkpoint",
+      "captured_at": "2026-08-22T01:10:35-05:00",
+      "integrity": "Sanitized authenticated UI observation: VC Control Lab, voice-control, and voice-probe exist; VC Control is only prefilled and no credential was displayed or copied.",
+      "supports_claim_ids": ["claim_live_setup", "claim_unknown"],
       "contradicts_claim_ids": []
     },
     {
@@ -277,8 +288,8 @@
       "kind": "LOG",
       "access": "GENERATED_CURRENT",
       "locator": "docs/COMPLETION_AUDIT.md#external-live-gates",
-      "captured_at": "2026-08-21T23:50:00-05:00",
-      "integrity": "Sanitized read-only gate check: required Cloudflare and Discord variables are unset and no ignored live secret file exists; no values or account identifiers are recorded.",
+      "captured_at": "2026-08-22T01:10:35-05:00",
+      "integrity": "Sanitized gate state: neither Discord application exists, Workers Paid is not enabled, and no credential or account identifier is recorded.",
       "supports_claim_ids": ["claim_unknown"],
       "contradicts_claim_ids": []
     }
@@ -308,12 +319,12 @@
   },
   "decision": {
     "iteration_choice": "ESCALATE",
-    "recommendation": "Keep the main implementation unchanged and hand Cloudflare account selection and paid-plan state, protected Discord setup, and Socialize authorization to their named human owners before any live action.",
+    "recommendation": "Preserve the completed private test surface and wait for action-time approval to create the two Discord application identities and enroll in Workers Paid; continue live proof only after the protected credential and permission steps.",
     "selected_action_ids": [],
     "rejected_options": [
       "Do not begin with Socialize or a production voice connection before private-guild and hosting proof."
     ],
-    "decision_claim_ids": ["claim_objective", "claim_unknown"],
+    "decision_claim_ids": ["claim_objective", "claim_live_setup", "claim_unknown"],
     "remaining_unknown_claim_ids": ["claim_unknown"],
     "human_owner": "Repository owner and authorized Discord or Cloudflare account owner",
     "consecutive_stable_checks": 1,
@@ -348,7 +359,7 @@
   },
   "closure": {
     "status": "OPEN",
-    "summary": "Implementation, documentation, local verification, CI construction, and main publication are complete. Cloudflare deployment, private-guild proof, rollback, and Socialize evidence remain externally blocked or unverified.",
+    "summary": "Implementation, documentation, local verification, CI construction, main publication, and the private server/channel prerequisite are complete. Discord application setup, Cloudflare deployment, private-guild command proof, rollback, and Socialize evidence remain externally blocked or unverified.",
     "residual_risks": [
       "Cloudflare Containers may fail a live UDP, DAVE, native-library, or lifecycle gate.",
       "Socialize may not approve installation or a supported retention mechanism."

@@ -53,15 +53,15 @@ Cloudflare Container hosting is accepted only if the dedicated probe passes ever
 - `INTEGRATION TESTED`: GitHub Actions runs `32551597849` and `32551599391` passed the complete verification, both Docker image builds, scans, dependency audit, and control Worker dry-run at commit `180abd0594980d0dbcaeddfa5cab53914bb54016`.
 - `INTEGRATION TESTED`: main-branch run `32552515725` passed the same repository and image-construction gates at commit `0f52c5332f1dbdb17fd04438e4e918a94c26fad9`.
 - `UNIT TESTED`: the canonical and installed `authorized-discord-bot-ops` skill copies validate and match byte-for-byte.
-- `UNVERIFIED`: no local Docker runtime, live Discord application, Discord voice transport, Cloudflare Container, or target-guild behavior is counted by these results.
+- `UNVERIFIED`: the private test server and requested channels are observed, but no live Discord application, command, voice transport, Cloudflare Container, or target-guild behavior is counted by these results.
 
 ## 7. Deployment State
 
 The control Worker, D1 database, Durable Object, private voice host, and probe are not deployed. No live URL, production database ID, Container revision, probe report, or rollback exercise exists.
 
-Cloudflare voice deployment is `BLOCKED`. A prior selected-account check reported that Container access requires Workers Paid. The current non-interactive recheck found two available accounts and no configured account selection, so the owner must first choose the intended account locally and then enable Workers Paid there if still required. Billing was not automated, and no account ID is committed.
+Cloudflare voice deployment is `BLOCKED`. Authorized UI selected the intended personal account and confirmed that Free is current while Workers Paid supplies Container access. The owner must authorize and complete that upgrade before deployment. Billing was not automated, and no account ID or billing detail is committed.
 
-The private `VC Control Lab` guild and its two applications are also `UNVERIFIED`. The authorized Computer helper was retried once and failed before window discovery with missing kernel assets, OS error 3. Login, MFA, CAPTCHA, credential display, token copying, security prompts, and permission confirmation remain manual in every case.
+The private `VC Control Lab` server, `voice-control`, and `voice-probe` now exist and were observed in authenticated live UI. The two application identities and every command, Gateway, voice, intent, credential, and permission path remain `UNVERIFIED`. Authorized Computer control is functional, but it remains paused before persistent application creation; login, MFA, CAPTCHA, credential display, token copying, security prompts, permission confirmation, and payment steps retain their protected boundaries.
 
 ## 8. Target-Guild State
 
@@ -77,8 +77,8 @@ The conventional-host fallback uses the same voice-agent image and authenticated
 
 ## 10. Remaining Work
 
-1. The user locally selects the intended Cloudflare account and manually enables Workers Paid there if still required, without sharing billing information or committing the account ID.
-2. An authorized operator creates `VC Control Lab`, `VC Control`, and `Voice Rooms`, handles protected credentials and permission confirmations, and completes the live private-guild command matrix.
+1. The user authorizes and completes Workers Paid on the already selected personal Cloudflare account without sharing billing information or committing the account ID.
+2. After action-time approval, finish creating `VC Control` and `Voice Rooms`, handle protected credentials and permission confirmations, and complete the live private-guild command matrix in the existing `VC Control Lab` surface.
 3. Deploy the control plane, run two fail-closed Container probe cycles, capture clean SIGTERM and distinct-run evidence, then choose Cloudflare or the documented conventional host from the result.
 4. Socialize staff completes `SOCIALIZE_INTAKE.md`. During the approved window, test only official-bot presence controls and one ordinary relay, then observe deletion without synthetic activity.
 5. Exercise rollback and credential rotation in the private environment. Until those actions occur, the corresponding labels remain `UNVERIFIED` or `BLOCKED`.

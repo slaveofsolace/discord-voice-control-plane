@@ -27,7 +27,7 @@ Create a private guild named `VC Control Lab` and two applications:
 
 Ordinary already-authenticated portal setup may use authorized Computer control. Stop for login, MFA, CAPTCHA, security or privacy prompts, permission confirmation, client-secret display, or bot-token display. The user completes those steps.
 
-Current helper status: the one authorized recheck stopped before window discovery with `failed to write kernel assets: The system cannot find the path specified. (os error 3)`. Use the manual portal path unless that helper is repaired separately.
+Current live checkpoint: authorized Computer control is functional and created the private `VC Control Lab` server, `voice-control`, and `voice-probe`. The `VC Control` name is prefilled in Discord's new-application dialog. Application creation, credential display, privileged intent changes, and permission grants remain protected action-time steps.
 
 Record application, guild, channel, user, and role IDs in a local ignored environment file. Do not commit them as deployment facts.
 
@@ -86,7 +86,7 @@ Use `/voice-admin setup`, inspect the created category and channels, then `/voic
 
 ## 5. Cloudflare Container gate
 
-Current blockers: a prior selected-account check reported that Workers Paid is required for Container access, while the latest non-interactive recheck found two available Cloudflare accounts and no selected account ID. The user must choose the intended personal account locally and enable Workers Paid there if still required. Do not commit its account ID. No script in this repository performs a billing action.
+Current blocker: authorized UI selected the intended personal Cloudflare account and confirmed that Free is current while Workers Paid supplies Container access. The owner must authorize and complete that upgrade before deployment. Do not commit the account ID or billing data. No script in this repository performs a billing action.
 
 After that approval:
 
