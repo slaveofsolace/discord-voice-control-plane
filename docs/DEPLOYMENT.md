@@ -45,6 +45,8 @@ Set required secrets through protected prompts:
 pnpm secrets:control
 ```
 
+For an automated first deployment, place the same values in an ignored, user-only `.env` file and set `DEPLOY_SECRETS_FILE` to its absolute path. Wrangler uploads that file alongside the code. Both Worker configurations declare their required secret names, so deployment fails closed if a required value is absent. Never commit or log the file.
+
 During a planned HMAC rotation, add the previous secret through a separate explicit prompt:
 
 ```sh
@@ -58,6 +60,7 @@ For the first D1 auto-provisioning deployment only:
 ```sh
 set DEPLOY_APPROVED=discord-voice-control-plane
 set INITIAL_D1_PROVISION=true
+set DEPLOY_SECRETS_FILE=C:\path\outside-git\control.env
 pnpm deploy:control
 ```
 
@@ -98,6 +101,7 @@ The probe is a separately named Container controlled by the private voice-host W
 The host schema rejects production and probe mode when both are enabled; run the probe with `HOST_ENABLED=false`, then disable the probe before enabling the production agent.
 
 1. Set the voice-host bot token and agent key with `pnpm secrets:voice-host`.
+   For an automated deployment, set `DEPLOY_SECRETS_FILE` to an ignored, user-only file containing those two values instead.
 2. Export the exact private test guild and voice channel IDs, set `HOST_ENABLED=false`, and set `PROBE_ENABLED=true`.
 3. Set `DEPLOY_APPROVED=discord-voice-control-plane` and run `pnpm deploy:voice-host`.
 4. Follow sanitized `cloudflare_voice_probe_result`, `cloudflare_voice_probe_shutdown`, `cloudflare_voice_probe_lifecycle`, and `voice_host_probe_cycle_complete` events.
@@ -118,6 +122,8 @@ Each complete report must prove:
 - a ready SIGTERM handler followed by clean Container exit evidence.
 
 Any missing field fails the gate. Do not deploy the voice host on Cloudflare after a failed UDP, DAVE, native, restart, or lifecycle result; use the fallback section.
+
+If the operator machine has no Docker-compatible CLI, first deploy the private voice-host Worker with both host modes disabled and `--containers-rollout=none`, then connect that Worker to this repository through Cloudflare Workers Builds. Keep the production branch on `main` and use the full `wrangler deploy` path so Cloudflare's build environment publishes both Dockerfile images. Runtime secrets remain Worker secrets; build variables contain only the non-secret deployment configuration. A successful build does not replace the live probe.
 
 ## 6. Deploy the private voice host
 

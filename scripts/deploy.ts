@@ -39,6 +39,11 @@ function optionalVariable(name: string): string[] {
   return value ? ["--var", `${name}:${value}`] : [];
 }
 
+function deploymentSecretsArguments(): string[] {
+  const value = process.env.DEPLOY_SECRETS_FILE?.trim();
+  return value ? ["--secrets-file", value] : [];
+}
+
 if (service === "control") {
   const config = "apps/control-worker/wrangler.jsonc";
   const vars = [
@@ -55,7 +60,8 @@ if (service === "control") {
     variable("AGENT_KEY_ID")
   ].flatMap((value) => ["--var", value]);
   vars.push(...optionalVariable("AGENT_PREVIOUS_KEY_ID"));
-  const deploy = () => run(["deploy", "--config", config, ...vars]);
+  const deploy = () =>
+    run(["deploy", "--config", config, ...deploymentSecretsArguments(), ...vars]);
   const migrate = () => run(["d1", "migrations", "apply", "DB", "--remote", "--config", config]);
   if (process.env.INITIAL_D1_PROVISION === "true") {
     await deploy();
@@ -86,5 +92,11 @@ if (service === "control") {
     variable("PROBE_STABLE_MS", "60000")
   ].flatMap((value) => ["--var", value]);
   vars.push(...optionalVariable("AGENT_PREVIOUS_KEY_ID"));
-  await run(["deploy", "--config", "apps/voice-host-worker/wrangler.jsonc", ...vars]);
+  await run([
+    "deploy",
+    "--config",
+    "apps/voice-host-worker/wrangler.jsonc",
+    ...deploymentSecretsArguments(),
+    ...vars
+  ]);
 }

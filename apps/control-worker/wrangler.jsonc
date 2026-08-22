@@ -11,6 +11,9 @@
   "triggers": {
     "crons": ["17 3 * * *"]
   },
+  "secrets": {
+    "required": ["AGENT_AUTH_SECRET", "INTERNAL_STATUS_SECRET"]
+  },
   "durable_objects": {
     "bindings": [
       {
