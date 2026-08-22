@@ -61,7 +61,9 @@ Workers Paid is active on the selected test account. The control Worker, D1 data
 
 Cloudflare voice deployment is `UNVERIFIED`, not billing-blocked. Authenticated account UI shows Workers Paid as the current plan and Containers included. No Worker, D1 database, Durable Object, or Container has been deployed, and no account ID or billing detail is committed.
 
-The private `VC Control Lab` server, `voice-control`, and `voice-probe` exist and were observed in authenticated live UI. The `VC Control` creation form is ready with its developer terms box selected, but Create was not pressed. The two application identities and every command, Gateway, voice, intent, credential, and permission path remain `UNVERIFIED`. Login, MFA, CAPTCHA, credential display, token copying, security prompts, and permission confirmations retain their protected boundaries. The owner completed the Cloudflare payment step; authenticated UI now shows Workers Paid as the current plan.
+The private `VC Control Lab` server, `voice-control`, and `voice-probe` exist and were observed in authenticated live UI. The owner confirmed official application creation and `VC Control` now exists; its public identifiers are stored only in an ignored local runtime file, and no credential was opened or copied. `Voice Rooms` creation is waiting on a second user-solved hCaptcha. Every command, Gateway, voice, intent, credential, and permission path remains `UNVERIFIED`. Login, MFA, CAPTCHA, credential display, token copying, security prompts, and permission confirmations retain their protected boundaries. The owner completed the Cloudflare payment step; authenticated UI shows Workers Paid as the current plan.
+
+During channel-ID inspection, Discord's `Open Chat` control unexpectedly joined the operator's user account to `voice-probe`. It was immediately disconnected; Discord displayed input error 3002 and no message was sent. This event is an operational incident, not bot, Gateway, UDP, DAVE, or hosting verification.
 
 ## 8. Target-Guild State
 

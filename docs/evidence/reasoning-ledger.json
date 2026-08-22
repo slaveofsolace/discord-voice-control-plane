@@ -3,7 +3,7 @@
   "ledger_id": "discord_voice_control",
   "created_at": "2026-08-21T23:00:00-05:00",
   "depth": "DEEP",
-  "iteration": 8,
+  "iteration": 9,
   "root": {
     "kind": "DECISION",
     "node_id": "root_node",
@@ -52,7 +52,7 @@
         "unknown_disposition": "Container UDP, DAVE, and lifecycle behavior require live proof."
       },
       "current_state_history": {
-        "summary": "The hardened implementation adds durable interaction and execution replay controls, fail-closed reconciliation, managed-room race and ACL guards, and a single Worker token boundary; the private VC Control Lab server and requested channels exist; Workers Paid is active; both Discord applications and every live runtime gate remain open; SOL Tools remained dirty and protected.",
+        "summary": "The hardened implementation adds durable interaction and execution replay controls, fail-closed reconciliation, managed-room race and ACL guards, and a single Worker token boundary; published main and exact-SHA CI are green; the private VC Control Lab server, requested channels, and VC Control application exist; Workers Paid is active; Voice Rooms creation is waiting on a user-solved hCaptcha; SOL Tools remained dirty and protected.",
         "knowledge": "KNOWN",
         "load_bearing": true,
         "claim_ids": [
@@ -221,7 +221,7 @@
     {
       "id": "claim_live_setup",
       "label": "OBSERVED",
-      "statement": "Authenticated live UI shows VC Control Lab with voice-control and voice-probe and Workers Paid as the current Cloudflare plan; no Discord application identity, credential, permission grant, or deployment was created.",
+      "statement": "Authenticated live UI shows VC Control Lab with voice-control and voice-probe, a created VC Control application, and Workers Paid as the current Cloudflare plan; Voice Rooms creation is waiting on a second hCaptcha, and no credential, permission grant, or deployment exists yet.",
       "evidence_ids": ["ev_live_setup", "ev_cloudflare_paid"],
       "contradiction_claim_ids": [],
       "confidence": {
@@ -254,12 +254,12 @@
     {
       "id": "claim_unknown",
       "label": "UNKNOWN",
-      "statement": "Both Discord application identities and protected grants, private-guild behavior, Container UDP and DAVE lifecycle behavior, rollback, and Socialize retention remain unresolved.",
+      "statement": "Voice Rooms application creation is waiting on hCaptcha; both applications' protected grants, private-guild behavior, Container UDP and DAVE lifecycle behavior, rollback, and Socialize retention remain unresolved.",
       "evidence_ids": ["ev_live_setup", "ev_runtime_prerequisites"],
       "contradiction_claim_ids": [],
       "confidence": {
         "level": "LOW",
-        "basis": "No live Discord application, command, voice, or deployed Container evidence exists yet."
+        "basis": "VC Control exists, but the confirmed Voice Rooms creation action reached Discord's human-verification gate; no live command, voice, permission, credential, or deployed Container evidence exists yet."
       }
     }
   ],
@@ -320,7 +320,7 @@
       "access": "INSPECTED_CURRENT",
       "locator": "docs/TEST_EVIDENCE.md#current-checkpoint",
       "captured_at": "2026-08-22T01:33:11-05:00",
-      "integrity": "Sanitized authenticated UI observation: VC Control Lab, voice-control, and voice-probe exist; VC Control is prefilled and its developer terms box is selected, but Create was not pressed and no credential was displayed or copied.",
+      "integrity": "Sanitized authenticated UI observation: VC Control Lab, voice-control, voice-probe, and VC Control exist; public identifiers are retained only under ignored runtime state; Voice Rooms creation is waiting on a second hCaptcha; no credential was displayed or copied.",
       "supports_claim_ids": ["claim_live_setup", "claim_unknown"],
       "contradicts_claim_ids": []
     },
@@ -340,7 +340,7 @@
       "access": "GENERATED_CURRENT",
       "locator": "docs/COMPLETION_AUDIT.md#external-live-gates",
       "captured_at": "2026-08-22T01:33:11-05:00",
-      "integrity": "Sanitized gate state: neither Discord application exists, Workers Paid is active, and no credential or account identifier is recorded.",
+      "integrity": "Sanitized gate state: VC Control exists, Voice Rooms creation is waiting on a user-solved hCaptcha, Workers Paid is active, published main CI is green, and no credential or account identifier is committed.",
       "supports_claim_ids": ["claim_unknown"],
       "contradicts_claim_ids": []
     }
@@ -582,7 +582,7 @@
   },
   "closure": {
     "status": "OPEN",
-    "summary": "Implementation, documentation, local verification, CI construction, main publication, and the private server/channel prerequisite are complete. Discord application setup, Cloudflare deployment, private-guild command proof, rollback, and Socialize evidence remain externally blocked or unverified.",
+    "summary": "Implementation, documentation, local verification, exact-SHA CI, main publication, private server/channels, and the VC Control identity are complete. Voice Rooms creation is waiting on hCaptcha; Cloudflare deployment, private-guild command proof, rollback, and Socialize evidence remain externally blocked or unverified.",
     "residual_risks": [
       "Cloudflare Containers may fail a live UDP, DAVE, native-library, or lifecycle gate.",
       "Socialize may not approve installation or a supported retention mechanism."

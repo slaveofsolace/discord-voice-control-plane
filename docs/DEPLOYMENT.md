@@ -27,13 +27,15 @@ Create a private guild named `VC Control Lab` and two applications:
 
 Ordinary already-authenticated portal setup may use authorized Computer control. Stop for login, MFA, CAPTCHA, security or privacy prompts, permission confirmation, client-secret display, or bot-token display. The user completes those steps.
 
-Current live checkpoint: authorized Computer control is functional and created the private `VC Control Lab` server, `voice-control`, and `voice-probe`. The `VC Control` name is prefilled and the developer terms box is selected in Discord's new-application dialog, but Create was not pressed. Application creation, credential display, privileged intent changes, and permission grants remain protected action-time steps.
+Current live checkpoint: authorized Computer control created the private `VC Control Lab` server, `voice-control`, `voice-probe`, and `VC Control` application. The public application identifiers are retained only in an ignored local runtime file. `Voice Rooms` creation is waiting on a user-solved hCaptcha. Credential display, privileged intent changes, and permission grants remain protected action-time steps.
 
 Record application, guild, channel, user, and role IDs in a local ignored environment file. Do not commit them as deployment facts.
 
 ## 3. Deploy the control Worker
 
 Wrangler's D1 binding is ID-free in the committed config. Generated account and database IDs remain untracked.
+
+If Wrangler can access more than one account, set `CLOUDFLARE_ACCOUNT_ID` in the invoking process before any secret or deployment command. Keep the selected value in an ignored local runtime file, not in Wrangler configuration or Git. A read-only `wrangler whoami` check must match the intended paid account before proceeding. The current private checkpoint matched the paid account, found no existing project Worker or Container, and found no project-named D1 collision.
 
 Set required secrets through protected prompts:
 
