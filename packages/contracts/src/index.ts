@@ -23,6 +23,7 @@ export const controlActionSchema = z.enum([
   "pause",
   "resume",
   "relay",
+  "relay_cancel",
   "diagnostics",
   "audit"
 ]);
@@ -37,7 +38,38 @@ export const commandPayloadSchemas = {
   reconnect: z.object({}),
   pause: z.object({}),
   resume: z.object({}),
-  relay: z.object({ text: z.string().min(1).max(1000) }),
+  relay: z.object({
+    text: z.string().min(1).max(1000),
+    request_id: z.uuid().optional(),
+    source_application_id: snowflakeSchema.optional(),
+    source_message_id: snowflakeSchema.optional(),
+    actor_role_ids: z.array(snowflakeSchema).max(100).optional(),
+    content_kind: z.enum(["ordinary_chat", "voice_command"]).optional(),
+    risk: z.enum(["OPERATOR", "ELEVATED"]).optional(),
+    parsed_command: z
+      .object({
+        name: z.enum([
+          "info",
+          "name",
+          "size",
+          "lock",
+          "unlock",
+          "permit",
+          "unpermit",
+          "kick",
+          "ban",
+          "unban",
+          "reset",
+          "claim"
+        ]),
+        argument: z.string().max(100).optional(),
+        user_id: snowflakeSchema.optional()
+      })
+      .strict()
+      .nullable()
+      .optional()
+  }),
+  relay_cancel: z.object({ request_id: z.uuid() }),
   diagnostics: z.object({}),
   audit: z.object({ limit: z.number().int().min(1).max(50).default(10) })
 } as const satisfies Record<ControlAction, z.ZodType>;
@@ -127,6 +159,125 @@ export const commandStartAckSchema = z.object({
   duplicate: z.boolean()
 });
 export type CommandStartAck = z.infer<typeof commandStartAckSchema>;
+
+export const relayContentKindSchema = z.enum(["ordinary_chat", "voice_command"]);
+export type RelayContentKind = z.infer<typeof relayContentKindSchema>;
+
+export const relayRiskSchema = z.enum(["OPERATOR", "ELEVATED"]);
+export type RelayRisk = z.infer<typeof relayRiskSchema>;
+
+export const relayStatusSchema = z.enum([
+  "RECEIVED",
+  "PENDING_USER_APPROVAL",
+  "PREPARED_FOR_MANUAL_SEND",
+  "OWNER_CONFIRMED_SENT",
+  "OWNER_REJECTED",
+  "EXPIRED",
+  "CANCELLED"
+]);
+export type RelayStatus = z.infer<typeof relayStatusSchema>;
+
+export const relayResultCodeSchema = z.enum([
+  "PENDING_USER_APPROVAL",
+  "PREPARED_FOR_MANUAL_SEND",
+  "OWNER_CONFIRMED_SENT",
+  "OWNER_REJECTED",
+  "REQUEST_EXPIRED",
+  "REQUEST_CANCELLED",
+  "LOCAL_AGENT_OFFLINE",
+  "RELAY_QUEUE_FULL",
+  "INVALID_RELAY_GRAMMAR",
+  "ELEVATED_OPERATOR_REQUIRED"
+]);
+export type RelayResultCode = z.infer<typeof relayResultCodeSchema>;
+
+export const parsedRelayCommandSchema = z
+  .object({
+    name: z.enum([
+      "info",
+      "name",
+      "size",
+      "lock",
+      "unlock",
+      "permit",
+      "unpermit",
+      "kick",
+      "ban",
+      "unban",
+      "reset",
+      "claim"
+    ]),
+    argument: z.string().max(100).optional(),
+    user_id: snowflakeSchema.optional()
+  })
+  .strict();
+export type ParsedRelayCommand = z.infer<typeof parsedRelayCommandSchema>;
+
+export const relayRequestSchema = z
+  .object({
+    request_id: z.uuid(),
+    command_id: z.uuid(),
+    deployment_id: z.string().min(1).max(64),
+    tenant_id: z.string().min(1).max(64),
+    profile_name: z.string().regex(/^[a-z][a-z0-9-]{0,31}$/u),
+    source_application_id: snowflakeSchema.nullable(),
+    source_message_id: snowflakeSchema.nullable(),
+    actor_user_id: snowflakeSchema,
+    actor_role_ids: z.array(snowflakeSchema).max(100),
+    control_guild_id: snowflakeSchema,
+    control_channel_id: snowflakeSchema,
+    target_guild_id: snowflakeSchema,
+    target_voice_channel_id: snowflakeSchema,
+    target_text_channel_id: snowflakeSchema,
+    content_kind: relayContentKindSchema,
+    risk: relayRiskSchema,
+    parsed_command: parsedRelayCommandSchema.nullable(),
+    content: z.string().min(1).max(1000).nullable(),
+    status: relayStatusSchema,
+    result_code: relayResultCodeSchema,
+    created_at: z.number().int().nonnegative(),
+    updated_at: z.number().int().nonnegative(),
+    expires_at: z.number().int().positive()
+  })
+  .strict();
+export type RelayRequest = z.infer<typeof relayRequestSchema>;
+
+export const relayStatusEventSchema = z
+  .object({
+    type: z.literal("relay_status"),
+    deployment_id: z.string().min(1).max(64),
+    request_id: z.uuid(),
+    command_id: z.uuid(),
+    actor_user_id: snowflakeSchema,
+    source_application_id: snowflakeSchema.nullable(),
+    source_message_id: snowflakeSchema.nullable(),
+    status: relayStatusSchema,
+    result_code: relayResultCodeSchema,
+    occurred_at: z.number().int().nonnegative()
+  })
+  .strict();
+export type RelayStatusEvent = z.infer<typeof relayStatusEventSchema>;
+
+const relayIngressBaseSchema = z.object({
+  version: z.literal(1),
+  deployment_id: z.string().min(1).max(64),
+  tenant_id: z.string().min(1).max(64),
+  application_id: snowflakeSchema,
+  source_message_id: snowflakeSchema,
+  actor_user_id: snowflakeSchema,
+  actor_role_ids: z.array(snowflakeSchema).max(100),
+  control_guild_id: snowflakeSchema,
+  control_channel_id: snowflakeSchema
+});
+
+export const relayIngressRequestSchema = z.discriminatedUnion("operation", [
+  relayIngressBaseSchema
+    .extend({ operation: z.literal("create"), content: z.string().min(1).max(4000) })
+    .strict(),
+  relayIngressBaseSchema.extend({ operation: z.literal("status"), request_id: z.uuid() }).strict(),
+  relayIngressBaseSchema.extend({ operation: z.literal("cancel"), request_id: z.uuid() }).strict()
+]);
+export type RelayIngressRequest = z.infer<typeof relayIngressRequestSchema>;
 
 export const agentStatusSchema = z.object({
   type: z.literal("status"),
@@ -241,7 +392,8 @@ export const agentMessageSchema = z.union([
   agentHeartbeatSchema,
   managedRoomEventSchema,
   guildConfigEventSchema,
-  authorizedTargetEventSchema
+  authorizedTargetEventSchema,
+  relayStatusEventSchema
 ]);
 export type AgentMessage = z.infer<typeof agentMessageSchema>;
 

@@ -23,6 +23,16 @@ const csvSnowflakes = z
   });
 
 const optionalSnowflake = z.union([snowflakeSchema, z.literal("")]).default("");
+const optionalHttpsUrl = z
+  .union([
+    z.url().refine((url) => url.startsWith("https://"), "Expected https:// URL"),
+    z.literal("")
+  ])
+  .default("");
+const profileName = z
+  .string()
+  .regex(/^[a-z][a-z0-9-]{0,31}$/u)
+  .default("main");
 
 const millisecondString = z
   .string()
@@ -46,9 +56,25 @@ export const controlEnvironmentSchema = z
     AGENT_PREVIOUS_AUTH_SECRET: z.string().min(32).optional(),
     AGENT_KEY_ID: z.string().min(1).max(64),
     AGENT_PREVIOUS_KEY_ID: z.string().min(1).max(64).optional(),
-    INTERNAL_STATUS_SECRET: z.string().min(32)
+    INTERNAL_STATUS_SECRET: z.string().min(32),
+    CONTROL_RELAY_ENABLED: booleanString,
+    CONTROL_RELAY_APPLICATION_ID: optionalSnowflake,
+    CONTROL_RELAY_CHANNEL_ID: optionalSnowflake,
+    RELAY_INGRESS_HMAC_SECRET: z.string().default("")
   })
   .superRefine((value, context) => {
+    if (
+      value.CONTROL_RELAY_ENABLED &&
+      (value.CONTROL_RELAY_APPLICATION_ID === "" ||
+        value.CONTROL_RELAY_CHANNEL_ID === "" ||
+        value.RELAY_INGRESS_HMAC_SECRET.length < 32)
+    ) {
+      context.addIssue({
+        code: "custom",
+        message: "Enabled relay ingress requires its application, exact channel, and HMAC secret",
+        path: ["CONTROL_RELAY_ENABLED"]
+      });
+    }
     if (
       (value.AGENT_PREVIOUS_KEY_ID === undefined) !==
       (value.AGENT_PREVIOUS_AUTH_SECRET === undefined)
@@ -95,7 +121,18 @@ export const voiceEnvironmentSchema = z
     PREFIX_COMMANDS_ENABLED: booleanString,
     MESSAGE_CONTENT_INTENT_ENABLED: booleanString,
     MANAGED_ROOMS_ENABLED: booleanString,
-    MANAGED_GUILD_IDS: csvSnowflakes
+    MANAGED_GUILD_IDS: csvSnowflakes,
+    CONTROL_RELAY_ENABLED: booleanString,
+    CONTROL_RELAY_ONLY: booleanString,
+    CONTROL_RELAY_APPLICATION_ID: optionalSnowflake,
+    CONTROL_GUILD_ID: optionalSnowflake,
+    CONTROL_RELAY_CHANNEL_ID: optionalSnowflake,
+    CONTROL_OPERATOR_USER_IDS: csvSnowflakes,
+    CONTROL_OPERATOR_ROLE_IDS: csvSnowflakes,
+    CONTROL_ELEVATED_USER_IDS: csvSnowflakes,
+    CONTROL_ELEVATED_ROLE_IDS: csvSnowflakes,
+    RELAY_INGRESS_ENDPOINT: optionalHttpsUrl,
+    RELAY_INGRESS_HMAC_SECRET: z.string().default("")
   })
   .superRefine((value, context) => {
     if (value.PREFIX_COMMANDS_ENABLED && !value.MESSAGE_CONTENT_INTENT_ENABLED) {
@@ -103,6 +140,40 @@ export const voiceEnvironmentSchema = z
         code: "custom",
         message: "Prefix commands require MESSAGE_CONTENT_INTENT_ENABLED=true",
         path: ["PREFIX_COMMANDS_ENABLED"]
+      });
+    }
+    if (value.CONTROL_RELAY_ENABLED && !value.MESSAGE_CONTENT_INTENT_ENABLED) {
+      context.addIssue({
+        code: "custom",
+        message: "Private relay intake requires MESSAGE_CONTENT_INTENT_ENABLED=true",
+        path: ["CONTROL_RELAY_ENABLED"]
+      });
+    }
+    if (
+      value.CONTROL_RELAY_ONLY &&
+      (!value.CONTROL_RELAY_ENABLED || value.PREFIX_COMMANDS_ENABLED || value.MANAGED_ROOMS_ENABLED)
+    ) {
+      context.addIssue({
+        code: "custom",
+        message:
+          "Relay-only mode requires private relay intake and forbids managed/prefix features",
+        path: ["CONTROL_RELAY_ONLY"]
+      });
+    }
+    if (
+      value.CONTROL_RELAY_ENABLED &&
+      (value.CONTROL_RELAY_APPLICATION_ID === "" ||
+        value.CONTROL_GUILD_ID === "" ||
+        value.CONTROL_RELAY_CHANNEL_ID === "" ||
+        value.RELAY_INGRESS_ENDPOINT === "" ||
+        value.RELAY_INGRESS_HMAC_SECRET.length < 32 ||
+        (value.CONTROL_OPERATOR_USER_IDS.size === 0 && value.CONTROL_OPERATOR_ROLE_IDS.size === 0))
+    ) {
+      context.addIssue({
+        code: "custom",
+        message:
+          "Enabled private relay intake requires exact IDs, operators, endpoint, and HMAC secret",
+        path: ["CONTROL_RELAY_ENABLED"]
       });
     }
     if (
@@ -149,7 +220,9 @@ export const userRpcEnvironmentSchema = z
     AGENT_AUTH_SECRET: z.string().min(32),
     AGENT_PREVIOUS_AUTH_SECRET: z.string().min(32).optional(),
     AGENT_KEY_ID: z.string().min(1).max(64),
-    AGENT_PREVIOUS_KEY_ID: z.string().min(1).max(64).optional()
+    AGENT_PREVIOUS_KEY_ID: z.string().min(1).max(64).optional(),
+    USER_RPC_PROFILE_NAME: profileName,
+    USER_RPC_SECRET_ROOT: z.string().min(1).default(".runtime/secrets/user-rpc")
   })
   .superRefine((value, context) => {
     if (

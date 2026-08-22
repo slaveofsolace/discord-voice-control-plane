@@ -47,7 +47,9 @@ const child = spawn(executable, requested, {
     USER_RPC_DISCORD_APPLICATION_ID: profile.applicationId,
     USER_RPC_DISCORD_ACCESS_TOKEN: profile.accessToken,
     USER_RPC_ALLOWED_GUILD_ID: profile.allowedGuildId,
-    USER_RPC_EXPECTED_USER_ID: profile.expectedUserId
+    USER_RPC_EXPECTED_USER_ID: profile.expectedUserId,
+    USER_RPC_PROFILE_NAME: profileName,
+    USER_RPC_SECRET_ROOT: dirname(profilePath)
   },
   shell: false,
   stdio: "inherit",

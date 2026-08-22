@@ -5,10 +5,11 @@ import {
   type AuthorizedTarget,
   type CommandAck,
   type CommandEnvelope,
+  type RelayRequest,
   type VoiceMachineEvent,
   type VoiceMachineSnapshot
 } from "@discord-vc-control/contracts";
-import { FixedWindowRateLimiter, sanitizeRelayText } from "@discord-vc-control/security";
+import { FixedWindowRateLimiter, parseRelayContent } from "@discord-vc-control/security";
 
 import {
   type DiscordRpcSession,
@@ -16,11 +17,17 @@ import {
   type VoiceSelection
 } from "./discord-rpc-session.js";
 import { type DraftHandoff } from "./draft-handoff.js";
+import { type EncryptedRelayQueue } from "./relay-queue.js";
 
 export interface UserRpcControllerOptions {
   allowedGuildId: string;
   deploymentId: string;
   draftHandoff: DraftHandoff;
+  profileName: string;
+  relayQueue: Pick<
+    EncryptedRelayQueue,
+    "enqueue" | "expire" | "get" | "invalidateContext" | "list" | "transition"
+  >;
   onStatus: (status: AgentStatus) => void;
   rpc: Pick<
     DiscordRpcSession,
@@ -39,6 +46,8 @@ export class UserRpcController {
   readonly #deploymentDraftLimiter = new FixedWindowRateLimiter(20, 60_000);
   readonly #operatorDraftLimiter = new FixedWindowRateLimiter(5, 60_000);
   #lastErrorCode: string | null = null;
+  #accessToken: string | null = null;
+  #expectedUserId: string | null = null;
   #machine: VoiceMachineSnapshot = {
     state: "DISABLED",
     desiredConnected: false,
@@ -49,6 +58,7 @@ export class UserRpcController {
   #rpcConnected = false;
   #selectedChannel: RpcChannel | null = null;
   #target: AuthorizedTarget | null = null;
+  #targetInitialized = false;
   #unsubscribeSelection: (() => void) | null = null;
   #unsubscribeDisconnect: (() => void) | null = null;
 
@@ -93,6 +103,8 @@ export class UserRpcController {
       throw new Error("RPC_SCOPE_MISSING");
     }
     this.#rpcConnected = true;
+    this.#accessToken = accessToken;
+    this.#expectedUserId = expectedUserId;
     this.#selectedChannel = await this.options.rpc.getSelectedVoiceChannel();
     this.#unsubscribeSelection = await this.options.rpc.subscribeVoiceSelection((selection) =>
       this.handleVoiceSelection(selection)
@@ -118,9 +130,22 @@ export class UserRpcController {
     const changed =
       this.#target?.guild_id !== target?.guild_id ||
       this.#target?.voice_channel_id !== target?.voice_channel_id ||
-      this.#target?.text_channel_id !== target?.text_channel_id;
+      this.#target?.text_channel_id !== target?.text_channel_id ||
+      this.#target?.authorized_at !== target?.authorized_at ||
+      this.#target?.authorized_by_user_id !== target?.authorized_by_user_id;
+    const authorizationChanged = this.#targetInitialized && changed;
     const oldTargetSelected = this.isTargetSelected();
     this.#target = target;
+    if (changed) {
+      await this.options.relayQueue.invalidateContext({
+        profileName: this.options.profileName,
+        force: authorizationChanged,
+        targetGuildId: target?.guild_id ?? null,
+        targetTextChannelId: target?.text_channel_id ?? null,
+        targetVoiceChannelId: target?.voice_channel_id ?? null
+      });
+    }
+    this.#targetInitialized = true;
     if (changed && this.#machine.desiredConnected) {
       this.block("RPC_TARGET_AUTHORIZATION_CHANGED", "AUTH_FAILURE");
       if (oldTargetSelected) await this.leaveSelectedChannel().catch(() => undefined);
@@ -187,10 +212,14 @@ export class UserRpcController {
           summary = "Local RPC voice control resumed at the exact voice target.";
           break;
         case "relay":
-          await this.stageDraft(command);
-          resultCode = "USER_SEND_REQUIRED";
-          summary =
-            "Draft copied locally and the authorized text channel selected; no message was sent.";
+          await this.enqueueRelay(command);
+          resultCode = "PENDING_USER_APPROVAL";
+          summary = "Relay request is encrypted locally and waiting for the account owner.";
+          break;
+        case "relay_cancel":
+          await this.cancelRelay(parseActionPayload("relay_cancel", command.payload).request_id);
+          resultCode = "REQUEST_CANCELLED";
+          summary = "Relay request cancelled before manual send.";
           break;
         case "audit":
           throw new Error("AUDIT_HANDLED_BY_CONTROL_PLANE");
@@ -235,6 +264,7 @@ export class UserRpcController {
     if (this.isTargetSelected()) await this.leaveSelectedChannel().catch(() => undefined);
     this.options.rpc.close();
     this.#rpcConnected = false;
+    this.#accessToken = null;
     this.publishStatus();
   }
 
@@ -278,9 +308,92 @@ export class UserRpcController {
     this.#selectedChannel = null;
   }
 
-  private async stageDraft(command: CommandEnvelope): Promise<void> {
+  async listRelayRequests(): Promise<RelayRequest[]> {
+    return this.options.relayQueue.list();
+  }
+
+  async prepareRelay(requestId: string): Promise<RelayRequest> {
+    const request = await this.options.relayQueue.get(requestId);
+    if (request === null) throw new Error("RELAY_REQUEST_NOT_FOUND");
+    if (request.status !== "PENDING_USER_APPROVAL" && request.status !== "RECEIVED") {
+      throw new Error("RELAY_REQUEST_NOT_PENDING");
+    }
+    if (request.content === null) throw new Error("RELAY_CONTENT_PURGED");
+    if (!this.#rpcConnected || this.#accessToken === null || this.#expectedUserId === null) {
+      throw new Error("DISCORD_RPC_NOT_CONNECTED");
+    }
+    const authenticated = await this.options.rpc.authenticate(this.#accessToken);
+    if (authenticated.userId !== this.#expectedUserId || !authenticated.scopes.includes("rpc")) {
+      this.block("RPC_AUTHORIZED_USER_MISMATCH", "AUTH_FAILURE");
+      throw new Error("RPC_AUTHORIZED_USER_MISMATCH");
+    }
     const target = this.requireTarget();
-    if (!this.isTargetSelected()) throw new Error("RPC_VOICE_NOT_CONNECTED");
+    if (
+      request.profile_name !== this.options.profileName ||
+      request.target_guild_id !== target.guild_id ||
+      request.target_voice_channel_id !== target.voice_channel_id ||
+      request.target_text_channel_id !== target.text_channel_id
+    ) {
+      await this.options.relayQueue.invalidateContext({
+        profileName: this.options.profileName,
+        targetGuildId: target.guild_id,
+        targetTextChannelId: target.text_channel_id,
+        targetVoiceChannelId: target.voice_channel_id
+      });
+      throw new Error("RELAY_TARGET_CHANGED");
+    }
+    const selectedVoice = await this.options.rpc.getSelectedVoiceChannel();
+    this.#selectedChannel = selectedVoice;
+    if (
+      selectedVoice?.id !== target.voice_channel_id ||
+      selectedVoice.guild_id !== target.guild_id ||
+      selectedVoice.type !== 2
+    ) {
+      throw new Error("RPC_VOICE_NOT_CONNECTED");
+    }
+    const selectedText = await this.options.rpc.selectTextChannel(target.text_channel_id);
+    if (selectedText?.id !== target.text_channel_id || selectedText.guild_id !== target.guild_id) {
+      throw new Error("RPC_TEXT_SELECTION_MISMATCH");
+    }
+    await this.options.draftHandoff.stage(request.content);
+    return this.options.relayQueue.transition(
+      requestId,
+      "PREPARED_FOR_MANUAL_SEND",
+      "PREPARED_FOR_MANUAL_SEND"
+    );
+  }
+
+  async rejectRelay(requestId: string): Promise<RelayRequest> {
+    return this.options.relayQueue.transition(requestId, "OWNER_REJECTED", "OWNER_REJECTED");
+  }
+
+  async expireRelay(requestId: string): Promise<RelayRequest> {
+    return this.options.relayQueue.transition(requestId, "EXPIRED", "REQUEST_EXPIRED");
+  }
+
+  async markRelaySent(requestId: string): Promise<RelayRequest> {
+    return this.options.relayQueue.transition(
+      requestId,
+      "OWNER_CONFIRMED_SENT",
+      "OWNER_CONFIRMED_SENT"
+    );
+  }
+
+  async markRelayNotSent(requestId: string): Promise<RelayRequest> {
+    return this.options.relayQueue.transition(
+      requestId,
+      "PENDING_USER_APPROVAL",
+      "PENDING_USER_APPROVAL"
+    );
+  }
+
+  async cancelRelay(requestId: string): Promise<RelayRequest> {
+    return this.options.relayQueue.transition(requestId, "CANCELLED", "REQUEST_CANCELLED");
+  }
+
+  private async enqueueRelay(command: CommandEnvelope): Promise<void> {
+    const target = this.requireTarget();
+    if (!this.#rpcConnected) throw new Error("DISCORD_RPC_NOT_CONNECTED");
     if (!this.#operatorDraftLimiter.consume(command.actor_user_id)) {
       throw new Error("OPERATOR_DRAFT_RATE_LIMIT");
     }
@@ -288,15 +401,41 @@ export class UserRpcController {
       throw new Error("DEPLOYMENT_DRAFT_RATE_LIMIT");
     }
     const payload = parseActionPayload("relay", command.payload);
-    const text = sanitizeRelayText(payload.text, {
-      maxLength: 1_000,
-      rejectedPrefixes: ["!voice", "!v"]
-    });
-    const selected = await this.options.rpc.selectTextChannel(target.text_channel_id);
-    if (selected?.id !== target.text_channel_id || selected.guild_id !== target.guild_id) {
-      throw new Error("RPC_TEXT_SELECTION_MISMATCH");
+    const parsed = parseRelayContent(payload.text);
+    if (
+      (payload.content_kind !== undefined && payload.content_kind !== parsed.contentKind) ||
+      (payload.risk !== undefined && payload.risk !== parsed.risk) ||
+      (payload.parsed_command !== undefined &&
+        JSON.stringify(payload.parsed_command) !== JSON.stringify(parsed.parsedCommand))
+    ) {
+      throw new Error("INVALID_RELAY_GRAMMAR");
     }
-    await this.options.draftHandoff.stage(text);
+    const now = Date.now();
+    await this.options.relayQueue.enqueue({
+      request_id: payload.request_id ?? command.command_id,
+      command_id: command.command_id,
+      deployment_id: command.deployment_id,
+      tenant_id: command.tenant_id,
+      profile_name: this.options.profileName,
+      source_application_id: payload.source_application_id ?? null,
+      source_message_id: payload.source_message_id ?? null,
+      actor_user_id: command.actor_user_id,
+      actor_role_ids: payload.actor_role_ids ?? [],
+      control_guild_id: command.control_guild_id,
+      control_channel_id: command.control_channel_id,
+      target_guild_id: target.guild_id,
+      target_voice_channel_id: target.voice_channel_id,
+      target_text_channel_id: target.text_channel_id,
+      content_kind: parsed.contentKind,
+      risk: parsed.risk,
+      parsed_command: parsed.parsedCommand,
+      content: parsed.text,
+      status: "RECEIVED",
+      result_code: "PENDING_USER_APPROVAL",
+      created_at: now,
+      updated_at: now,
+      expires_at: now + 30 * 60_000
+    });
   }
 
   private handleVoiceSelection(selection: VoiceSelection): void {
@@ -388,7 +527,9 @@ export class UserRpcController {
         "The authorized local user is not connected to the exact voice target.",
       RPC_TARGET_GUILD_NOT_ALLOWED: "The target is outside this local profile's allowed server.",
       OPERATOR_DRAFT_RATE_LIMIT: "This operator reached the local draft limit.",
-      DEPLOYMENT_DRAFT_RATE_LIMIT: "This deployment reached the local draft limit."
+      DEPLOYMENT_DRAFT_RATE_LIMIT: "This deployment reached the local draft limit.",
+      RELAY_QUEUE_FULL: "The local approval queue is full.",
+      INVALID_RELAY_GRAMMAR: "The relay content did not match the allowed grammar."
     };
     return messages[code] ?? `Command rejected: ${code}.`;
   }

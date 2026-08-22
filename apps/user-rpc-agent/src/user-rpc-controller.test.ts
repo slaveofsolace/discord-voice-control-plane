@@ -1,7 +1,11 @@
 import { describe, expect, it, vi } from "vitest";
 
 import { commandFixture } from "@discord-vc-control/testing";
-import { type CommandEnvelope, type UnsignedCommandEnvelope } from "@discord-vc-control/contracts";
+import {
+  type CommandEnvelope,
+  type RelayRequest,
+  type UnsignedCommandEnvelope
+} from "@discord-vc-control/contracts";
 
 import { type DiscordRpcSession, type RpcChannel } from "./discord-rpc-session.js";
 import { UserRpcController } from "./user-rpc-controller.js";
@@ -29,6 +33,34 @@ function command(overrides: Partial<UnsignedCommandEnvelope> = {}): CommandEnvel
 
 function channel(id: string, type = 2): RpcChannel {
   return { id, guild_id: ids.allowedGuild, name: "target", type };
+}
+
+function pendingRelay(): RelayRequest {
+  return {
+    request_id: "00000000-0000-5000-8000-000000000001",
+    command_id: "00000000-0000-5000-8000-000000000001",
+    deployment_id: "test",
+    tenant_id: "test",
+    profile_name: "main",
+    source_application_id: "100000000000000010",
+    source_message_id: "100000000000000011",
+    actor_user_id: ids.actor,
+    actor_role_ids: [],
+    control_guild_id: "100000000000000012",
+    control_channel_id: "100000000000000013",
+    target_guild_id: ids.allowedGuild,
+    target_voice_channel_id: ids.voice,
+    target_text_channel_id: ids.text,
+    content_kind: "ordinary_chat",
+    risk: "OPERATOR",
+    parsed_command: null,
+    content: "manual draft",
+    status: "PENDING_USER_APPROVAL",
+    result_code: "PENDING_USER_APPROVAL",
+    created_at: Date.now(),
+    updated_at: Date.now(),
+    expires_at: Date.now() + 30 * 60_000
+  };
 }
 
 function harness() {
@@ -64,11 +96,25 @@ function harness() {
     | "subscribeVoiceSelection"
   >;
   const draftHandoff = { stage: vi.fn().mockResolvedValue(undefined) };
+  const relayQueue = {
+    enqueue: vi.fn().mockImplementation(async (request) => ({
+      ...request,
+      status: "PENDING_USER_APPROVAL",
+      result_code: "PENDING_USER_APPROVAL"
+    })),
+    expire: vi.fn().mockResolvedValue(undefined),
+    get: vi.fn().mockResolvedValue(null),
+    invalidateContext: vi.fn().mockResolvedValue(0),
+    list: vi.fn().mockResolvedValue([]),
+    transition: vi.fn()
+  };
   const onStatus = vi.fn();
   const controller = new UserRpcController({
     allowedGuildId: ids.allowedGuild,
     deploymentId: "test",
     draftHandoff,
+    profileName: "main",
+    relayQueue,
     onStatus,
     rpc
   });
@@ -78,6 +124,7 @@ function harness() {
     draftHandoff,
     onStatus,
     rpc,
+    relayQueue,
     selection: () => selectionHandler
   };
 }
@@ -108,8 +155,8 @@ describe("authorized local user RPC controller", () => {
     expect(controller.status.observed_state).toBe("BLOCKED");
   });
 
-  it("stages a sanitized local draft but does not claim it sent a user message", async () => {
-    const { controller, draftHandoff, rpc } = harness();
+  it("queues an encrypted local approval request without selecting text or touching the clipboard", async () => {
+    const { controller, draftHandoff, relayQueue, rpc } = harness();
     await controller.initialize("oauth-access-token", ids.user);
     await controller.setTarget(target);
     await controller.execute(command({ action: "join" }));
@@ -118,11 +165,14 @@ describe("authorized local user RPC controller", () => {
     );
     expect(receipt).toMatchObject({
       accepted: true,
-      result_code: "USER_SEND_REQUIRED",
-      summary: expect.stringContaining("no message was sent")
+      result_code: "PENDING_USER_APPROVAL",
+      summary: expect.stringContaining("waiting for the account owner")
     });
-    expect(rpc.selectTextChannel).toHaveBeenCalledWith(ids.text);
-    expect(draftHandoff.stage).toHaveBeenCalledWith("review this message");
+    expect(relayQueue.enqueue).toHaveBeenCalledWith(
+      expect.objectContaining({ content: "review this message", profile_name: "main" })
+    );
+    expect(rpc.selectTextChannel).not.toHaveBeenCalled();
+    expect(draftHandoff.stage).not.toHaveBeenCalled();
   });
 
   it("blocks an unexpected disconnect instead of auto-rejoining", async () => {
@@ -137,6 +187,61 @@ describe("authorized local user RPC controller", () => {
       last_error_code: "RPC_UNEXPECTED_VOICE_DISCONNECT"
     });
     expect(rpc.selectVoiceChannel).toHaveBeenCalledTimes(1);
+  });
+
+  it("prepares only after rechecking account, exact voice, exact text, and target", async () => {
+    const { controller, draftHandoff, relayQueue, rpc } = harness();
+    await controller.initialize("oauth-access-token", ids.user);
+    await controller.setTarget(target);
+    rpc.getSelectedVoiceChannel.mockResolvedValue(channel(ids.voice));
+    relayQueue.get.mockResolvedValue(pendingRelay());
+    relayQueue.transition.mockResolvedValue({
+      ...pendingRelay(),
+      status: "PREPARED_FOR_MANUAL_SEND",
+      result_code: "PREPARED_FOR_MANUAL_SEND"
+    });
+    await expect(controller.prepareRelay(pendingRelay().request_id)).resolves.toMatchObject({
+      status: "PREPARED_FOR_MANUAL_SEND"
+    });
+    expect(rpc.authenticate).toHaveBeenCalledTimes(2);
+    expect(rpc.selectTextChannel).toHaveBeenCalledWith(ids.text);
+    expect(draftHandoff.stage).toHaveBeenCalledWith("manual draft");
+  });
+
+  it("does not prepare for the wrong signed-in user or wrong selected voice", async () => {
+    const { controller, draftHandoff, relayQueue, rpc } = harness();
+    await controller.initialize("oauth-access-token", ids.user);
+    await controller.setTarget(target);
+    relayQueue.get.mockResolvedValue(pendingRelay());
+    rpc.authenticate.mockResolvedValueOnce({
+      userId: "100000000000000099",
+      scopes: ["rpc"],
+      expires: "later"
+    });
+    await expect(controller.prepareRelay(pendingRelay().request_id)).rejects.toThrow(
+      "RPC_AUTHORIZED_USER_MISMATCH"
+    );
+    expect(draftHandoff.stage).not.toHaveBeenCalled();
+
+    const second = harness();
+    await second.controller.initialize("oauth-access-token", ids.user);
+    await second.controller.setTarget(target);
+    second.relayQueue.get.mockResolvedValue(pendingRelay());
+    second.rpc.getSelectedVoiceChannel.mockResolvedValue(channel("100000000000000099"));
+    await expect(second.controller.prepareRelay(pendingRelay().request_id)).rejects.toThrow(
+      "RPC_VOICE_NOT_CONNECTED"
+    );
+    expect(second.draftHandoff.stage).not.toHaveBeenCalled();
+  });
+
+  it("invalidates all pending requests after target reauthorization", async () => {
+    const { controller, relayQueue } = harness();
+    await controller.initialize("oauth-access-token", ids.user);
+    await controller.setTarget(target);
+    await controller.setTarget({ ...target, authorized_at: 2 });
+    expect(relayQueue.invalidateContext).toHaveBeenLastCalledWith(
+      expect.objectContaining({ force: true })
+    );
   });
 
   it("blocks when the authorized desktop RPC pipe closes", async () => {

@@ -7,12 +7,15 @@ import {
   ReplayGuard,
   agentHandshakePayload,
   canonicalJson,
+  parseRelayContent,
   redactSecrets,
   sanitizeRelayText,
   signAgentHandshake,
+  signRelayIngress,
   signCommandEnvelope,
   verifyAgentHandshake,
-  verifyCommandEnvelope
+  verifyCommandEnvelope,
+  verifyRelayIngress
 } from "./index.js";
 
 const secret = "fixture-secret-with-at-least-thirty-two-bytes";
@@ -93,6 +96,79 @@ describe("command authentication", () => {
 });
 
 describe("replay, relay, and redaction controls", () => {
+  it("authenticates the exact raw relay ingress body and rejects tampering", async () => {
+    const input = { nonce: "nonce-long-enough-0001", rawBody: '{"safe":true}', timestamp: 123 };
+    const signature = await signRelayIngress(input, secret);
+    await expect(verifyRelayIngress({ ...input, signature }, secret)).resolves.toBe(true);
+    await expect(
+      verifyRelayIngress({ ...input, rawBody: '{"safe":false}', signature }, secret)
+    ).resolves.toBe(false);
+  });
+
+  it.each(["!voice", "!v"])("parses every allowed %s command and risk", (prefix) => {
+    const cases = [
+      ["info", "OPERATOR"],
+      ["name Quiet room", "OPERATOR"],
+      ["size 1", "OPERATOR"],
+      ["size 99", "OPERATOR"],
+      ["size unlimited", "OPERATOR"],
+      ["lock", "OPERATOR"],
+      ["unlock", "OPERATOR"],
+      ["permit <@100000000000000001>", "ELEVATED"],
+      ["unpermit 100000000000000001", "ELEVATED"],
+      ["kick <@!100000000000000001>", "ELEVATED"],
+      ["ban 100000000000000001", "ELEVATED"],
+      ["unban 100000000000000001", "ELEVATED"],
+      ["reset", "ELEVATED"],
+      ["claim", "ELEVATED"]
+    ] as const;
+    for (const [command, risk] of cases) {
+      const parsed = parseRelayContent(`${prefix} ${command}`);
+      expect(parsed).toMatchObject({ contentKind: "voice_command", risk });
+    }
+  });
+
+  it("normalizes ordinary chat and rejects mention, slash, bang, control, and bidi syntax", () => {
+    expect(parseRelayContent(" cafe\u0301 ")).toEqual({
+      contentKind: "ordinary_chat",
+      parsedCommand: null,
+      risk: "OPERATOR",
+      text: "café"
+    });
+    for (const rejected of [
+      "/command",
+      "!unknown",
+      "hello <@100000000000000001>",
+      "hello <@&100000000000000001>",
+      "hello <#100000000000000001>",
+      "hello @everyone",
+      "hello @here",
+      "line\nline",
+      "hidden\u202Etext"
+    ]) {
+      expect(() => parseRelayContent(rejected)).toThrow();
+    }
+  });
+
+  it("enforces command arguments and exact size/name/user boundaries", () => {
+    for (const rejected of [
+      "!voice info extra",
+      "!voice lock extra",
+      "!voice reset extra",
+      "!voice name",
+      `!voice name ${"x".repeat(101)}`,
+      "!voice size 0",
+      "!voice size 100",
+      "!voice size many",
+      "!voice permit user",
+      "!voice permit 123",
+      "!voice permit 100000000000000001 extra",
+      "!voices info"
+    ]) {
+      expect(() => parseRelayContent(rejected)).toThrow();
+    }
+  });
+
   it("rejects nonce replay until the retention window expires", () => {
     const guard = new ReplayGuard(100);
     expect(guard.accept("nonce", 0)).toBe(true);

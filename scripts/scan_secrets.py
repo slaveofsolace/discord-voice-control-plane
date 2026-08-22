@@ -16,7 +16,7 @@ PATTERNS = {
 }
 SECRET_ASSIGNMENT = re.compile(
     r"(?im)^[ \t]*(?:DISCORD_BOT_TOKEN|CONTROL_DISCORD_CLIENT_SECRET|AGENT_AUTH_SECRET|"
-    r"AGENT_PREVIOUS_AUTH_SECRET|INTERNAL_STATUS_SECRET)[ \t]*=[ \t]*([^\s#][^\r\n]*)$"
+    r"AGENT_PREVIOUS_AUTH_SECRET|INTERNAL_STATUS_SECRET|RELAY_INGRESS_HMAC_SECRET)[ \t]*=[ \t]*([^\s#][^\r\n]*)$"
 )
 PLACEHOLDERS = ("replace", "example", "changeme", "<", "${")
 

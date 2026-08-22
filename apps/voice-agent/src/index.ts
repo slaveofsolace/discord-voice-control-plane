@@ -1,6 +1,9 @@
 import { createServer } from "node:http";
 
 import {
+  ActionRowBuilder,
+  ButtonBuilder,
+  ButtonStyle,
   ChannelType,
   Client,
   Events,
@@ -26,6 +29,8 @@ import { ManagedRoomService } from "./managed-rooms.js";
 import { parsePrefixCommand, voiceSubcommands, type VoiceSubcommand } from "./prefix.js";
 import { asVoiceAdminSubcommand, requiresManageChannels } from "./voice-admin-authorization.js";
 import { VoiceController } from "./voice-controller.js";
+import { authorizeControlRelayMessage, type ControlRelayConfig } from "./control-relay.js";
+import { RelayIngressClient } from "./relay-ingress-client.js";
 
 const environment = voiceEnvironmentSchema.parse(process.env);
 const port = Number(process.env.PORT ?? "8080");
@@ -60,8 +65,9 @@ function log(
   else console.info(line);
 }
 
-const intents = [GatewayIntentBits.Guilds, GatewayIntentBits.GuildVoiceStates];
-if (environment.PREFIX_COMMANDS_ENABLED) {
+const intents = [GatewayIntentBits.Guilds];
+if (!environment.CONTROL_RELAY_ONLY) intents.push(GatewayIntentBits.GuildVoiceStates);
+if (environment.PREFIX_COMMANDS_ENABLED || environment.CONTROL_RELAY_ENABLED) {
   intents.push(GatewayIntentBits.GuildMessages, GatewayIntentBits.MessageContent);
 }
 const client = new Client({
@@ -71,11 +77,31 @@ const client = new Client({
 
 let lastBootstrap: AgentBootstrap | null = null;
 const commandReceipts = new Map<string, CommandAck>();
+const relayConfig: ControlRelayConfig | null = environment.CONTROL_RELAY_ENABLED
+  ? {
+      applicationId: environment.CONTROL_RELAY_APPLICATION_ID,
+      channelId: environment.CONTROL_RELAY_CHANNEL_ID,
+      deploymentId: environment.DEPLOYMENT_ID,
+      elevatedRoleIds: environment.CONTROL_ELEVATED_ROLE_IDS,
+      elevatedUserIds: environment.CONTROL_ELEVATED_USER_IDS,
+      guildId: environment.CONTROL_GUILD_ID,
+      operatorRoleIds: environment.CONTROL_OPERATOR_ROLE_IDS,
+      operatorUserIds: environment.CONTROL_OPERATOR_USER_IDS,
+      tenantId: environment.TENANT_ID
+    }
+  : null;
+const relayIngress = environment.CONTROL_RELAY_ENABLED
+  ? new RelayIngressClient({
+      endpoint: environment.RELAY_INGRESS_ENDPOINT,
+      secret: environment.RELAY_INGRESS_HMAC_SECRET
+    })
+  : null;
+let relayApplicationVerified = relayConfig === null;
 
 const controller = new VoiceController({
   client,
   deploymentId: environment.DEPLOYMENT_ID,
-  onStatus: (status) => agentClient.send(status)
+  onStatus: (status) => agentClient?.send(status)
 });
 
 const managedRooms = new ManagedRoomService({
@@ -86,7 +112,7 @@ const managedRooms = new ManagedRoomService({
   targetApproverUserIds: environment.TARGET_APPROVER_USER_IDS,
   onEvent: (event: AgentMessage) => {
     if (event.type === "authorized_target_event") controller.setTarget(event.target);
-    agentClient.send(event);
+    agentClient?.send(event);
   }
 });
 
@@ -119,32 +145,34 @@ async function handleControlCommand(command: CommandEnvelope, duplicate: boolean
   if (duplicate) {
     const receipt = commandReceipts.get(command.command_id);
     if (receipt !== undefined) {
-      agentClient.send({ ...receipt, duplicate: true, occurred_at: Date.now() });
+      agentClient?.send({ ...receipt, duplicate: true, occurred_at: Date.now() });
     }
     return;
   }
   const receipt = await controller.execute(command);
   commandReceipts.set(command.command_id, receipt);
-  agentClient.send(receipt);
+  agentClient?.send(receipt);
 }
 
-const agentClient = new AgentClient({
-  deploymentId: environment.DEPLOYMENT_ID,
-  tenantId: environment.TENANT_ID,
-  endpoint: environment.AGENT_ENDPOINT,
-  keyId: environment.AGENT_KEY_ID,
-  secret: environment.AGENT_AUTH_SECRET,
-  ...(environment.AGENT_PREVIOUS_KEY_ID === undefined
-    ? {}
-    : { previousKeyId: environment.AGENT_PREVIOUS_KEY_ID }),
-  ...(environment.AGENT_PREVIOUS_AUTH_SECRET === undefined
-    ? {}
-    : { previousSecret: environment.AGENT_PREVIOUS_AUTH_SECRET }),
-  onBlocked: (code) => controller.handleControlPlaneFailure(code),
-  onBootstrap: applyBootstrap,
-  onCommand: handleControlCommand
-});
-controller.start();
+const agentClient: AgentClient | null = environment.CONTROL_RELAY_ONLY
+  ? null
+  : new AgentClient({
+      deploymentId: environment.DEPLOYMENT_ID,
+      tenantId: environment.TENANT_ID,
+      endpoint: environment.AGENT_ENDPOINT,
+      keyId: environment.AGENT_KEY_ID,
+      secret: environment.AGENT_AUTH_SECRET,
+      ...(environment.AGENT_PREVIOUS_KEY_ID === undefined
+        ? {}
+        : { previousKeyId: environment.AGENT_PREVIOUS_KEY_ID }),
+      ...(environment.AGENT_PREVIOUS_AUTH_SECRET === undefined
+        ? {}
+        : { previousSecret: environment.AGENT_PREVIOUS_AUTH_SECRET }),
+      onBlocked: (code) => controller.handleControlPlaneFailure(code),
+      onBootstrap: applyBootstrap,
+      onCommand: handleControlCommand
+    });
+if (!environment.CONTROL_RELAY_ONLY) controller.start();
 
 function asVoiceSubcommand(value: string): VoiceSubcommand {
   if (!(voiceSubcommands as readonly string[]).includes(value))
@@ -159,7 +187,14 @@ async function guildMemberFor(userId: string, guildId: string): Promise<GuildMem
 
 client.once(Events.ClientReady, (readyClient) => {
   void (async () => {
+    if (relayConfig !== null && readyClient.application.id !== relayConfig.applicationId) {
+      log("error", "control_relay_application_mismatch");
+      await readyClient.destroy();
+      return;
+    }
+    relayApplicationVerified = true;
     log("info", "gateway_ready", { bot_user_id: readyClient.user.id });
+    if (environment.CONTROL_RELAY_ONLY) return;
     if (lastBootstrap !== null) {
       await reconcileManagedRooms(lastBootstrap);
       await controller
@@ -179,7 +214,39 @@ client.once(Events.ClientReady, (readyClient) => {
 
 client.on(Events.InteractionCreate, (interaction) => {
   void (async () => {
+    if (
+      interaction.isButton() &&
+      interaction.inGuild() &&
+      relayConfig !== null &&
+      relayIngress !== null
+    ) {
+      if (!relayApplicationVerified) return;
+      const match = /^relay:(status|cancel):([a-f\d-]{36})$/iu.exec(interaction.customId);
+      if (match?.[1] === undefined || match[2] === undefined) return;
+      const member = await guildMemberFor(interaction.user.id, interaction.guildId);
+      const operation = match[1].toLowerCase() as "status" | "cancel";
+      const result = await relayIngress.send({
+        version: 1,
+        operation,
+        deployment_id: relayConfig.deploymentId,
+        tenant_id: relayConfig.tenantId,
+        application_id: relayConfig.applicationId,
+        source_message_id: interaction.id,
+        actor_user_id: interaction.user.id,
+        actor_role_ids: [...member.roles.cache.keys()],
+        control_guild_id: interaction.guildId,
+        control_channel_id: interaction.channelId,
+        request_id: match[2]
+      });
+      await interaction.reply({
+        content: `Relay request ${result.request_id ?? match[2]}: ${result.status ?? "unavailable"} (${result.result_code}).`,
+        flags: MessageFlags.Ephemeral,
+        allowedMentions: { parse: [] }
+      });
+      return;
+    }
     if (!interaction.isChatInputCommand() || !interaction.inGuild()) return;
+    if (environment.CONTROL_RELAY_ONLY) return;
     if (interaction.commandName !== "voice" && interaction.commandName !== "voice-admin") return;
     await interaction.deferReply({ flags: MessageFlags.Ephemeral });
     try {
@@ -247,9 +314,72 @@ client.on(Events.InteractionCreate, (interaction) => {
   );
 });
 
-if (environment.PREFIX_COMMANDS_ENABLED) {
+if (environment.PREFIX_COMMANDS_ENABLED || environment.CONTROL_RELAY_ENABLED) {
   client.on(Events.MessageCreate, (message) => {
     void (async () => {
+      if (
+        relayConfig !== null &&
+        relayIngress !== null &&
+        message.guildId === relayConfig.guildId &&
+        message.channelId === relayConfig.channelId
+      ) {
+        if (message.author.bot) return;
+        if (!relayApplicationVerified) {
+          await message.reply({
+            content: "Relay rejected: CONTROL_RELAY_APPLICATION_MISMATCH.",
+            allowedMentions: { parse: [], repliedUser: false }
+          });
+          return;
+        }
+        try {
+          const member =
+            message.member ?? (await message.guild?.members.fetch(message.author.id)) ?? null;
+          if (member === null) throw new Error("RELAY_MEMBER_UNAVAILABLE");
+          const authorized = authorizeControlRelayMessage(
+            {
+              actorRoleIds: [...member.roles.cache.keys()],
+              actorUserId: message.author.id,
+              applicationId: relayConfig.applicationId,
+              attachmentCount: message.attachments.size,
+              bot: message.author.bot,
+              channelId: message.channelId,
+              content: message.content,
+              edited: message.editedTimestamp !== null,
+              embedCount: message.embeds.length,
+              guildId: message.guildId,
+              messageId: message.id,
+              thread: message.channel.isThread(),
+              webhook: message.webhookId !== null
+            },
+            relayConfig
+          );
+          const result = await relayIngress.send(authorized.request);
+          if (!result.accepted || result.request_id === null) throw new Error(result.result_code);
+          const controls = new ActionRowBuilder<ButtonBuilder>().addComponents(
+            new ButtonBuilder()
+              .setCustomId(`relay:status:${result.request_id}`)
+              .setLabel("Status")
+              .setStyle(ButtonStyle.Secondary),
+            new ButtonBuilder()
+              .setCustomId(`relay:cancel:${result.request_id}`)
+              .setLabel("Cancel")
+              .setStyle(ButtonStyle.Danger)
+          );
+          await message.reply({
+            content: `Relay request ${result.request_id}: ${result.status ?? "RECEIVED"} (${result.result_code}).${authorized.parsed.risk === "ELEVATED" ? " ELEVATED RISK — local owner review required." : ""}`,
+            components: [controls],
+            allowedMentions: { parse: [], repliedUser: false }
+          });
+        } catch (error) {
+          const code = error instanceof Error ? error.message.slice(0, 64) : "RELAY_REJECTED";
+          await message.reply({
+            content: `Relay rejected: ${code}.`,
+            allowedMentions: { parse: [], repliedUser: false }
+          });
+        }
+        return;
+      }
+      if (!environment.PREFIX_COMMANDS_ENABLED) return;
       if (
         message.author.bot ||
         message.guild === null ||
@@ -278,6 +408,7 @@ if (environment.PREFIX_COMMANDS_ENABLED) {
 }
 
 client.on(Events.VoiceStateUpdate, (oldState, newState) => {
+  if (environment.CONTROL_RELAY_ONLY) return;
   if (oldState.id === client.user?.id || newState.id === client.user?.id) {
     controller.handleOwnVoiceState(oldState, newState);
   }
@@ -289,6 +420,7 @@ client.on(Events.VoiceStateUpdate, (oldState, newState) => {
 });
 
 client.on(Events.ChannelDelete, (channel) => {
+  if (environment.CONTROL_RELAY_ONLY) return;
   if (!("guildId" in channel)) return;
   managedRooms.handleChannelDelete(channel.id, channel.guildId);
   controller.handleChannelDelete(channel.id);
@@ -314,13 +446,13 @@ const healthServer = createServer((request, response) => {
 healthServer.listen(port, "0.0.0.0", () => log("info", "health_listener_ready", { port }));
 
 const heartbeatTimer = setInterval(() => {
-  agentClient.send({
+  agentClient?.send({
     type: "heartbeat",
     deployment_id: environment.DEPLOYMENT_ID,
     sent_at: Date.now(),
     gateway_sequence: null
   });
-  agentClient.send(controller.status);
+  agentClient?.send(controller.status);
   const cutoff = Date.now() - 24 * 60 * 60_000;
   for (const [commandId, receipt] of commandReceipts) {
     if (receipt.occurred_at < cutoff) commandReceipts.delete(commandId);
@@ -333,9 +465,9 @@ async function shutdown(signal: string): Promise<void> {
   shuttingDown = true;
   log("info", "shutdown_started", { signal });
   clearInterval(heartbeatTimer);
-  controller.shutdown();
-  agentClient.send(controller.status);
-  agentClient.close();
+  if (!environment.CONTROL_RELAY_ONLY) controller.shutdown();
+  agentClient?.send(controller.status);
+  agentClient?.close();
   await client.destroy();
   await new Promise<void>((resolve) => healthServer.close(() => resolve()));
   log("info", "shutdown_complete");
@@ -344,7 +476,10 @@ async function shutdown(signal: string): Promise<void> {
 process.once("SIGTERM", () => void shutdown("SIGTERM"));
 process.once("SIGINT", () => void shutdown("SIGINT"));
 
-await Promise.all([client.login(environment.DISCORD_BOT_TOKEN), agentClient.start()]);
+await Promise.all([
+  client.login(environment.DISCORD_BOT_TOKEN),
+  agentClient?.start() ?? Promise.resolve()
+]);
 if (!voiceSessionStateSchema.safeParse(controller.status.observed_state).success) {
   throw new Error("INVALID_INITIAL_STATE");
 }

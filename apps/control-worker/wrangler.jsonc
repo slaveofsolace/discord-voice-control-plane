@@ -12,7 +12,7 @@
     "crons": ["17 3 * * *"]
   },
   "secrets": {
-    "required": ["AGENT_AUTH_SECRET", "INTERNAL_STATUS_SECRET"]
+    "required": ["AGENT_AUTH_SECRET", "INTERNAL_STATUS_SECRET", "RELAY_INGRESS_HMAC_SECRET"]
   },
   "durable_objects": {
     "bindings": [
@@ -44,6 +44,9 @@
     "CONTROL_OPERATOR_ROLE_IDS": "",
     "CONTROL_ELEVATED_USER_IDS": "100000000000000004",
     "CONTROL_ELEVATED_ROLE_IDS": "",
+    "CONTROL_RELAY_ENABLED": "false",
+    "CONTROL_RELAY_APPLICATION_ID": "",
+    "CONTROL_RELAY_CHANNEL_ID": "",
     "AGENT_KEY_ID": "local-v1"
   }
 }

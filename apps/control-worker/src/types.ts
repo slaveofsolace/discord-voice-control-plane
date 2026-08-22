@@ -13,11 +13,15 @@ export interface Env {
   CONTROL_OPERATOR_ROLE_IDS: string;
   CONTROL_ELEVATED_USER_IDS: string;
   CONTROL_ELEVATED_ROLE_IDS: string;
+  CONTROL_RELAY_ENABLED: string;
+  CONTROL_RELAY_APPLICATION_ID: string;
+  CONTROL_RELAY_CHANNEL_ID: string;
   AGENT_KEY_ID: string;
   AGENT_AUTH_SECRET: string;
   AGENT_PREVIOUS_KEY_ID?: string;
   AGENT_PREVIOUS_AUTH_SECRET?: string;
   INTERNAL_STATUS_SECRET: string;
+  RELAY_INGRESS_HMAC_SECRET: string;
 }
 
 export interface DiscordInteraction {

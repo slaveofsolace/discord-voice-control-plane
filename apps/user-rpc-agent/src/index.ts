@@ -1,4 +1,4 @@
-import { createServer } from "node:http";
+import { resolve } from "node:path";
 
 import { AgentClient } from "@discord-vc-control/agent-client";
 import { userRpcEnvironmentSchema } from "@discord-vc-control/config";
@@ -12,6 +12,9 @@ import { redactSecrets } from "@discord-vc-control/security";
 import { DiscordIpcClient } from "./discord-ipc.js";
 import { DiscordRpcSession } from "./discord-rpc-session.js";
 import { WindowsClipboardDraftHandoff } from "./draft-handoff.js";
+import { ensureDashboardSecret, LocalRelayDashboard } from "./dashboard.js";
+import { EncryptedRelayQueue } from "./relay-queue.js";
+import { ProfileRuntimeLock } from "./profile-lock.js";
 import { UserRpcController } from "./user-rpc-controller.js";
 
 const environment = userRpcEnvironmentSchema.parse(process.env);
@@ -52,11 +55,27 @@ const ipc = new DiscordIpcClient(environment.USER_RPC_DISCORD_APPLICATION_ID);
 const rpc = new DiscordRpcSession(ipc, environment.USER_RPC_DISCORD_APPLICATION_ID);
 let agentClient: AgentClient | null = null;
 const receipts = new Map<string, CommandAck>();
+const secretRoot = resolve(environment.USER_RPC_SECRET_ROOT);
+const profileLock = await ProfileRuntimeLock.acquire(
+  secretRoot,
+  environment.DEPLOYMENT_ID,
+  environment.USER_RPC_PROFILE_NAME
+);
+const relayQueue = new EncryptedRelayQueue({
+  deploymentId: environment.DEPLOYMENT_ID,
+  profileName: environment.USER_RPC_PROFILE_NAME,
+  secretRoot,
+  onStatus: (event) => agentClient?.send(event)
+});
+await relayQueue.initialize();
+const dashboardSecret = await ensureDashboardSecret(secretRoot, environment.USER_RPC_PROFILE_NAME);
 
 const controller = new UserRpcController({
   allowedGuildId: environment.USER_RPC_ALLOWED_GUILD_ID,
   deploymentId: environment.DEPLOYMENT_ID,
   draftHandoff: new WindowsClipboardDraftHandoff(),
+  profileName: environment.USER_RPC_PROFILE_NAME,
+  relayQueue,
   rpc,
   onStatus: (status) => agentClient?.send(status)
 });
@@ -96,20 +115,7 @@ agentClient = new AgentClient({
   onCommand: handleControlCommand
 });
 
-const healthServer = createServer((request, response) => {
-  if (request.method !== "GET" || request.url !== "/healthz") {
-    response.writeHead(404).end("Not found");
-    return;
-  }
-  response.writeHead(200, { "content-type": "application/json; charset=utf-8" });
-  response.end(
-    JSON.stringify({
-      ok: controller.status.local_rpc_connected === true,
-      service: "user-rpc-agent",
-      observed_state: controller.status.observed_state
-    })
-  );
-});
+const dashboard = new LocalRelayDashboard({ controller, port, secret: dashboardSecret.secret });
 
 await controller.initialize(
   environment.USER_RPC_DISCORD_ACCESS_TOKEN,
@@ -117,8 +123,13 @@ await controller.initialize(
 );
 await agentClient.start();
 agentClient.send(controller.status);
-
-healthServer.listen(port, "127.0.0.1", () => log("info", "health_listener_ready", { port }));
+await dashboard.start();
+log("info", "relay_dashboard_ready", {
+  url: `http://127.0.0.1:${port}/`,
+  dashboard_secret_path: dashboardSecret.path,
+  queue_state_path: relayQueue.statePath,
+  profile: environment.USER_RPC_PROFILE_NAME
+});
 
 const heartbeatTimer = setInterval(() => {
   agentClient?.send({
@@ -128,6 +139,7 @@ const heartbeatTimer = setInterval(() => {
     gateway_sequence: null
   });
   agentClient?.send(controller.status);
+  void relayQueue.expire();
   const cutoff = Date.now() - 24 * 60 * 60_000;
   for (const [commandId, receipt] of receipts) {
     if (receipt.occurred_at < cutoff) receipts.delete(commandId);
@@ -143,7 +155,8 @@ async function shutdown(signal: string): Promise<void> {
   await controller.shutdown();
   agentClient?.send(controller.status);
   agentClient?.close();
-  await new Promise<void>((resolve) => healthServer.close(() => resolve()));
+  await dashboard.close();
+  await profileLock.close();
   log("info", "shutdown_complete");
 }
 

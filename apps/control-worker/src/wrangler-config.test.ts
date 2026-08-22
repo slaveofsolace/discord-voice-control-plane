@@ -15,12 +15,14 @@ describe("control Worker configuration", () => {
   });
 
   it("declares the control-plane secrets required at deployment", () => {
-    expect(config).toMatch(/"required"\s*:\s*\["AGENT_AUTH_SECRET",\s*"INTERNAL_STATUS_SECRET"\]/u);
+    expect(config).toMatch(
+      /"required"\s*:\s*\["AGENT_AUTH_SECRET",\s*"INTERNAL_STATUS_SECRET",\s*"RELAY_INGRESS_HMAC_SECRET"\]/u
+    );
   });
 
   it("declares the voice-host secrets required at deployment", () => {
     expect(voiceHostConfig).toMatch(
-      /"required"\s*:\s*\["DISCORD_BOT_TOKEN",\s*"AGENT_AUTH_SECRET"\]/u
+      /"required"\s*:\s*\["DISCORD_BOT_TOKEN",\s*"AGENT_AUTH_SECRET",\s*"RELAY_INGRESS_HMAC_SECRET"\]/u
     );
   });
 });

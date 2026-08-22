@@ -8,7 +8,8 @@ import {
   type AgentBootstrap,
   type AgentMessage,
   type CommandAck,
-  type CommandStart
+  type CommandStart,
+  type RelayStatusEvent
 } from "@discord-vc-control/contracts";
 import {
   agentHandshakePayload,
@@ -49,6 +50,16 @@ type PersistentAgentEvent = Extract<
 
 interface ExpirationRow extends Record<string, SqlStorageValue> {
   expires_at: number | null;
+}
+
+interface RelaySourceRow extends Record<string, SqlStorageValue> {
+  actor_user_id: string;
+  command_id: string;
+  content_hash: string;
+  request_id: string;
+  result_code: string;
+  source_key: string;
+  status: string;
 }
 
 const agentHeartbeatStaleMs = 45_000;
@@ -110,6 +121,16 @@ export class AgentSession extends DurableObject<Env> {
         error_code TEXT NOT NULL,
         created_at INTEGER NOT NULL
       );
+      CREATE TABLE IF NOT EXISTS relay_sources (
+        request_id TEXT PRIMARY KEY,
+        source_key TEXT NOT NULL UNIQUE,
+        command_id TEXT NOT NULL,
+        content_hash TEXT NOT NULL,
+        actor_user_id TEXT NOT NULL,
+        status TEXT NOT NULL,
+        result_code TEXT NOT NULL,
+        expires_at INTEGER NOT NULL
+      );
     `);
     this.migrateLegacyStateOutbox();
   }
@@ -134,6 +155,15 @@ export class AgentSession extends DurableObject<Env> {
     if (url.pathname === "/audit-outbox" && request.method === "POST") {
       return this.storeAuditOutbox(request);
     }
+    if (url.pathname === "/relay-claims" && request.method === "POST") {
+      return this.acceptRelayClaim(request);
+    }
+    if (url.pathname.startsWith("/relay-status/") && request.method === "GET") {
+      return this.getRelayStatus(url.pathname.slice("/relay-status/".length));
+    }
+    if (url.pathname === "/relay-claim-abort" && request.method === "POST") {
+      return this.abortRelayClaim(request);
+    }
     return new Response("Not found", { status: 404 });
   }
 
@@ -147,23 +177,27 @@ export class AgentSession extends DurableObject<Env> {
     } catch {
       retryAt = Date.now() + 5_000;
     }
-    const next = this.ctx.storage.sql
-      .exec<ExpirationRow>(
-        `SELECT MIN(expires_at) AS expires_at FROM (
-           SELECT expires_at FROM nonces
-           UNION ALL SELECT expires_at FROM pending_commands
-           UNION ALL SELECT expires_at FROM executing_commands
-           UNION ALL SELECT expires_at FROM receipts
-           UNION ALL SELECT expires_at FROM interaction_ids
-         )`
-      )
-      .one();
+    const expirationQueries = [
+      "SELECT MIN(expires_at) AS expires_at FROM nonces",
+      "SELECT MIN(expires_at) AS expires_at FROM pending_commands",
+      "SELECT MIN(expires_at) AS expires_at FROM executing_commands",
+      "SELECT MIN(expires_at) AS expires_at FROM receipts",
+      "SELECT MIN(expires_at) AS expires_at FROM interaction_ids",
+      "SELECT MIN(expires_at) AS expires_at FROM relay_sources"
+    ] as const;
+    let nextExpiration: number | null = null;
+    for (const query of expirationQueries) {
+      const candidate = this.ctx.storage.sql.exec<ExpirationRow>(query).one().expires_at;
+      if (candidate !== null) {
+        nextExpiration = nextExpiration === null ? candidate : Math.min(nextExpiration, candidate);
+      }
+    }
     let nextAt =
       retryAt === null
-        ? next.expires_at
-        : next.expires_at === null
+        ? nextExpiration
+        : nextExpiration === null
           ? retryAt
-          : Math.min(retryAt, next.expires_at);
+          : Math.min(retryAt, nextExpiration);
     const sessionDeadline = this.nextAgentSessionDeadline();
     if (sessionDeadline !== null) {
       nextAt = nextAt === null ? sessionDeadline : Math.min(nextAt, sessionDeadline);
@@ -202,6 +236,10 @@ export class AgentSession extends DurableObject<Env> {
       }
       if (parsed.type === "command_start") {
         await this.storeCommandStart(webSocket, parsed);
+        return;
+      }
+      if (parsed.type === "relay_status") {
+        await this.storeRelayStatus(parsed);
         return;
       }
       if (parsed.type === "managed_room_event") {
@@ -303,6 +341,17 @@ export class AgentSession extends DurableObject<Env> {
     if (verified.tenant_id !== this.env.TENANT_ID) {
       return Response.json({ error: "WRONG_TENANT" }, { status: 409 });
     }
+    if (request.headers.get("x-require-local-rpc") === "true") {
+      const status = this.status();
+      if (
+        !status.agentConnected ||
+        status.heartbeatStale ||
+        status.status?.agent_kind !== "authorized_local_rpc" ||
+        status.status.local_rpc_connected !== true
+      ) {
+        return Response.json({ error: "LOCAL_AGENT_OFFLINE" }, { status: 409 });
+      }
+    }
     this.purgeExpiredSessionRows();
     const existing = this.receipt(verified.command_id);
     if (existing !== null) {
@@ -376,6 +425,147 @@ export class AgentSession extends DurableObject<Env> {
     );
     await this.scheduleCleanup(expiresAt);
     return Response.json({ duplicate: false, command_id: input.command_id });
+  }
+
+  private async acceptRelayClaim(request: Request): Promise<Response> {
+    const input = await request.json<Record<string, unknown>>();
+    if (
+      typeof input.request_id !== "string" ||
+      !/^[a-f\d]{8}-[a-f\d]{4}-5[a-f\d]{3}-[89ab][a-f\d]{3}-[a-f\d]{12}$/iu.test(
+        input.request_id
+      ) ||
+      typeof input.source_key !== "string" ||
+      input.source_key.length < 10 ||
+      input.source_key.length > 256 ||
+      typeof input.content_hash !== "string" ||
+      !/^[a-f\d]{64}$/iu.test(input.content_hash) ||
+      typeof input.actor_user_id !== "string" ||
+      !/^\d{17,20}$/u.test(input.actor_user_id) ||
+      typeof input.nonce !== "string" ||
+      input.nonce.length < 16 ||
+      input.nonce.length > 128
+    ) {
+      return Response.json({ error: "INVALID_RELAY_CLAIM" }, { status: 400 });
+    }
+    this.purgeExpiredSessionRows();
+    if (!this.consumeNonce(input.nonce)) {
+      return Response.json({ error: "RELAY_NONCE_REPLAY" }, { status: 409 });
+    }
+    const existingBySource = this.ctx.storage.sql
+      .exec<RelaySourceRow>("SELECT * FROM relay_sources WHERE source_key = ?", input.source_key)
+      .toArray()[0];
+    if (existingBySource !== undefined) {
+      if (
+        existingBySource.request_id !== input.request_id ||
+        existingBySource.content_hash !== input.content_hash ||
+        existingBySource.actor_user_id !== input.actor_user_id
+      ) {
+        return Response.json({ error: "RELAY_SOURCE_COLLISION" }, { status: 409 });
+      }
+      return Response.json({ duplicate: true, request_id: existingBySource.request_id });
+    }
+    const expiresAt = Date.now() + 30 * 24 * 60 * 60_000;
+    this.ctx.storage.sql.exec(
+      `INSERT INTO relay_sources
+        (request_id, source_key, command_id, content_hash, actor_user_id, status,
+         result_code, expires_at)
+       VALUES (?, ?, ?, ?, ?, 'RECEIVED', 'PENDING_USER_APPROVAL', ?)`,
+      input.request_id,
+      input.source_key,
+      input.request_id,
+      input.content_hash,
+      input.actor_user_id,
+      expiresAt
+    );
+    await this.scheduleCleanup(expiresAt);
+    return Response.json({ duplicate: false, request_id: input.request_id });
+  }
+
+  private async abortRelayClaim(request: Request): Promise<Response> {
+    const input = await request.json<{ request_id?: unknown }>();
+    if (typeof input.request_id !== "string" || !/^[a-f\d-]{36}$/iu.test(input.request_id)) {
+      return new Response("Invalid relay request", { status: 400 });
+    }
+    const inFlight = this.ctx.storage.sql
+      .exec<{ count: number }>(
+        `SELECT
+          (SELECT COUNT(*) FROM pending_commands WHERE command_id = ?) +
+          (SELECT COUNT(*) FROM executing_commands WHERE command_id = ?) +
+          (SELECT COUNT(*) FROM receipts WHERE command_id = ?) AS count`,
+        input.request_id,
+        input.request_id,
+        input.request_id
+      )
+      .one().count;
+    if (inFlight > 0) return Response.json({ aborted: false, in_flight: true }, { status: 409 });
+    this.ctx.storage.sql.exec(
+      "DELETE FROM relay_sources WHERE request_id = ? AND status = 'RECEIVED'",
+      input.request_id
+    );
+    return Response.json({ aborted: true });
+  }
+
+  private getRelayStatus(requestId: string): Response {
+    if (!/^[a-f\d-]{36}$/iu.test(requestId)) return new Response("Bad request id", { status: 400 });
+    this.purgeExpiredSessionRows();
+    const row = this.ctx.storage.sql
+      .exec<RelaySourceRow>(
+        `SELECT request_id, actor_user_id, status, result_code, command_id,
+                content_hash, source_key
+           FROM relay_sources WHERE request_id = ?`,
+        requestId
+      )
+      .toArray()[0];
+    if (row === undefined) return new Response(null, { status: 404 });
+    return Response.json({
+      request_id: row.request_id,
+      actor_user_id: row.actor_user_id,
+      status: row.status,
+      result_code: row.result_code
+    });
+  }
+
+  private async storeRelayStatus(event: RelayStatusEvent): Promise<void> {
+    if (event.deployment_id !== this.env.DEPLOYMENT_ID) throw new Error("WRONG_DEPLOYMENT");
+    const existing = this.ctx.storage.sql
+      .exec<RelaySourceRow>("SELECT * FROM relay_sources WHERE request_id = ?", event.request_id)
+      .toArray()[0];
+    if (existing?.command_id !== event.command_id) {
+      throw new Error("UNKNOWN_RELAY_REQUEST");
+    }
+    const terminal = new Set(["OWNER_CONFIRMED_SENT", "OWNER_REJECTED", "EXPIRED", "CANCELLED"]);
+    if (terminal.has(existing.status) && existing.status !== event.status) {
+      throw new Error("RELAY_TERMINAL_STATE");
+    }
+    this.ctx.storage.sql.exec(
+      "UPDATE relay_sources SET status = ?, result_code = ? WHERE request_id = ?",
+      event.status,
+      event.result_code,
+      event.request_id
+    );
+    try {
+      await this.env.DB.batch([
+        this.env.DB.prepare(
+          `UPDATE relay_requests SET status = ?, result_code = ?, updated_at = ?
+            WHERE deployment_id = ? AND request_id = ?`
+        ).bind(
+          event.status,
+          event.result_code,
+          event.occurred_at,
+          this.env.DEPLOYMENT_ID,
+          event.request_id
+        ),
+        this.env.DB.prepare(
+          `UPDATE audit_events SET result_code = ?
+            WHERE deployment_id = ? AND command_id = ?`
+        ).bind(event.result_code, this.env.DEPLOYMENT_ID, event.command_id)
+      ]);
+    } catch {
+      this.ctx.storage.sql.exec(
+        "UPDATE session_state SET last_error = ? WHERE id = 1",
+        "RELAY_STATUS_D1_DEFERRED"
+      );
+    }
   }
 
   private getReceipt(commandId: string): Response {
@@ -1136,6 +1326,7 @@ export class AgentSession extends DurableObject<Env> {
     this.ctx.storage.sql.exec("DELETE FROM executing_commands WHERE expires_at <= ?", now);
     this.ctx.storage.sql.exec("DELETE FROM receipts WHERE expires_at <= ?", now);
     this.ctx.storage.sql.exec("DELETE FROM interaction_ids WHERE expires_at <= ?", now);
+    this.ctx.storage.sql.exec("DELETE FROM relay_sources WHERE expires_at <= ?", now);
   }
 
   private async scheduleCleanup(expiresAt: number): Promise<void> {

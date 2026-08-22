@@ -1,5 +1,8 @@
 import {
   commandEnvelopeSchema,
+  type ParsedRelayCommand,
+  type RelayContentKind,
+  type RelayRisk,
   type CommandEnvelope,
   type UnsignedCommandEnvelope
 } from "@discord-vc-control/contracts";
@@ -7,6 +10,9 @@ import {
 const encoder = new TextEncoder();
 const forbiddenControls = /[\u0000-\u001F\u007F-\u009F]/u;
 const bidiControls = /[\u061C\u200E\u200F\u202A-\u202E\u2066-\u2069]/u;
+const discordMentionSyntax = /<@!?\d{17,20}>|<@&\d{17,20}>|<#\d{17,20}>|@(everyone|here)\b/iu;
+const exactUserMention = /^<@!?(\d{17,20})>$/u;
+const exactSnowflake = /^\d{17,20}$/u;
 
 export function canonicalJson(value: unknown): string {
   if (value === null || typeof value === "boolean" || typeof value === "string") {
@@ -130,6 +136,36 @@ export async function verifyAgentHandshake(
   }
 }
 
+export function relayIngressSignaturePayload(input: {
+  nonce: string;
+  rawBody: string;
+  timestamp: number;
+}): string {
+  return `${input.timestamp}\n${input.nonce}\n${input.rawBody}`;
+}
+
+export async function signRelayIngress(
+  input: { nonce: string; rawBody: string; timestamp: number },
+  secret: string
+): Promise<string> {
+  return signAgentHandshake(relayIngressSignaturePayload(input), secret);
+}
+
+export async function verifyRelayIngress(
+  input: { nonce: string; rawBody: string; signature: string; timestamp: number },
+  secret: string
+): Promise<boolean> {
+  return verifyAgentHandshake(
+    relayIngressSignaturePayload({
+      nonce: input.nonce,
+      rawBody: input.rawBody,
+      timestamp: input.timestamp
+    }),
+    input.signature,
+    secret
+  );
+}
+
 export class ReplayGuard {
   readonly #seen = new Map<string, number>();
 
@@ -168,6 +204,96 @@ export function sanitizeRelayText(text: string, options: SanitizeRelayOptions = 
     throw new Error("RELAY_COMMAND_TEXT_REJECTED");
   }
   return normalized;
+}
+
+export interface ParsedRelayContent {
+  contentKind: RelayContentKind;
+  parsedCommand: ParsedRelayCommand | null;
+  risk: RelayRisk;
+  text: string;
+}
+
+const operatorVoiceCommands = new Set(["info", "name", "size", "lock", "unlock"]);
+const elevatedVoiceCommands = new Set([
+  "permit",
+  "unpermit",
+  "kick",
+  "ban",
+  "unban",
+  "reset",
+  "claim"
+]);
+const userArgumentCommands = new Set(["permit", "unpermit", "kick", "ban", "unban"]);
+
+function rejectUnsafeText(value: string): void {
+  if (forbiddenControls.test(value) || bidiControls.test(value)) {
+    throw new Error("RELAY_CONTROL_CHARACTER");
+  }
+}
+
+function parseUserArgument(value: string): string {
+  if (exactSnowflake.test(value)) return value;
+  const mention = exactUserMention.exec(value);
+  if (mention?.[1] !== undefined) return mention[1];
+  throw new Error("RELAY_USER_ARGUMENT_INVALID");
+}
+
+function parseVoiceCommand(text: string, prefix: "!v" | "!voice"): ParsedRelayContent {
+  const remainder = text.slice(prefix.length).trim();
+  if (remainder.length === 0) throw new Error("RELAY_VOICE_SUBCOMMAND_REQUIRED");
+  const separator = remainder.search(/\s/u);
+  const name = (separator < 0 ? remainder : remainder.slice(0, separator)).toLowerCase();
+  const argument = separator < 0 ? "" : remainder.slice(separator).trim();
+  if (!operatorVoiceCommands.has(name) && !elevatedVoiceCommands.has(name)) {
+    throw new Error("RELAY_VOICE_SUBCOMMAND_UNKNOWN");
+  }
+  const risk: RelayRisk = elevatedVoiceCommands.has(name) ? "ELEVATED" : "OPERATOR";
+  let parsed: ParsedRelayCommand;
+  if (name === "name") {
+    const normalizedName = argument.normalize("NFC").trim();
+    rejectUnsafeText(normalizedName);
+    if (normalizedName.length < 1 || normalizedName.length > 100) {
+      throw new Error("RELAY_VOICE_NAME_INVALID");
+    }
+    if (discordMentionSyntax.test(normalizedName)) throw new Error("RELAY_MENTION_REJECTED");
+    parsed = { name, argument: normalizedName };
+  } else if (name === "size") {
+    const normalizedSize = argument.toLowerCase();
+    if (normalizedSize !== "unlimited" && !/^(?:[1-9]|[1-9]\d)$/u.test(normalizedSize)) {
+      throw new Error("RELAY_VOICE_SIZE_INVALID");
+    }
+    parsed = { name, argument: normalizedSize };
+  } else if (userArgumentCommands.has(name)) {
+    if (argument.length === 0 || /\s/u.test(argument)) {
+      throw new Error("RELAY_USER_ARGUMENT_INVALID");
+    }
+    parsed = {
+      name: name as "permit" | "unpermit" | "kick" | "ban" | "unban",
+      user_id: parseUserArgument(argument)
+    };
+  } else {
+    if (argument.length !== 0) throw new Error("RELAY_VOICE_ARGUMENT_UNEXPECTED");
+    parsed = {
+      name: name as "info" | "lock" | "unlock" | "reset" | "claim"
+    };
+  }
+  return { contentKind: "voice_command", parsedCommand: parsed, risk, text };
+}
+
+export function parseRelayContent(input: string): ParsedRelayContent {
+  const text = input.normalize("NFC").trim();
+  if (text.length === 0) throw new Error("RELAY_EMPTY");
+  if (text.length > 1_000) throw new Error("RELAY_TOO_LONG");
+  rejectUnsafeText(text);
+  if (text.startsWith("/")) throw new Error("RELAY_SLASH_COMMAND_REJECTED");
+  const lowered = text.toLowerCase();
+  if (lowered === "!voice" || lowered.startsWith("!voice ")) {
+    return parseVoiceCommand(text, "!voice");
+  }
+  if (lowered === "!v" || lowered.startsWith("!v ")) return parseVoiceCommand(text, "!v");
+  if (text.startsWith("!")) throw new Error("RELAY_UNKNOWN_BANG_COMMAND");
+  if (discordMentionSyntax.test(text)) throw new Error("RELAY_MENTION_REJECTED");
+  return { contentKind: "ordinary_chat", parsedCommand: null, risk: "OPERATOR", text };
 }
 
 export function redactSecrets(value: string, secrets: readonly string[] = []): string {

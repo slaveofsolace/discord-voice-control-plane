@@ -22,6 +22,17 @@ interface Env {
   MANAGED_ROOMS_ENABLED: string;
   MANAGED_GUILD_IDS: string;
   TARGET_APPROVER_USER_IDS: string;
+  CONTROL_RELAY_ENABLED: string;
+  CONTROL_RELAY_ONLY: string;
+  CONTROL_RELAY_APPLICATION_ID: string;
+  CONTROL_GUILD_ID: string;
+  CONTROL_RELAY_CHANNEL_ID: string;
+  CONTROL_OPERATOR_USER_IDS: string;
+  CONTROL_OPERATOR_ROLE_IDS: string;
+  CONTROL_ELEVATED_USER_IDS: string;
+  CONTROL_ELEVATED_ROLE_IDS: string;
+  RELAY_INGRESS_ENDPOINT: string;
+  RELAY_INGRESS_HMAC_SECRET: string;
   AGENT_KEY_ID: string;
   AGENT_PREVIOUS_KEY_ID?: string;
   DISCORD_BOT_TOKEN: string;
@@ -48,6 +59,17 @@ interface AgentStartConfiguration {
   prefixCommandsEnabled: string;
   targetApproverUserIds: string;
   tenantId: string;
+  controlRelayEnabled: string;
+  controlRelayOnly: string;
+  controlRelayApplicationId: string;
+  controlGuildId: string;
+  controlRelayChannelId: string;
+  controlOperatorUserIds: string;
+  controlOperatorRoleIds: string;
+  controlElevatedUserIds: string;
+  controlElevatedRoleIds: string;
+  relayIngressEndpoint: string;
+  relayIngressHmacSecret: string;
 }
 
 interface ReconcileResult {
@@ -84,7 +106,18 @@ export class VoiceAgentContainer extends Container<Env> {
       PORT: "8080",
       PREFIX_COMMANDS_ENABLED: configuration.prefixCommandsEnabled,
       TARGET_APPROVER_USER_IDS: configuration.targetApproverUserIds,
-      TENANT_ID: configuration.tenantId
+      TENANT_ID: configuration.tenantId,
+      CONTROL_RELAY_ENABLED: configuration.controlRelayEnabled,
+      CONTROL_RELAY_ONLY: configuration.controlRelayOnly,
+      CONTROL_RELAY_APPLICATION_ID: configuration.controlRelayApplicationId,
+      CONTROL_GUILD_ID: configuration.controlGuildId,
+      CONTROL_RELAY_CHANNEL_ID: configuration.controlRelayChannelId,
+      CONTROL_OPERATOR_USER_IDS: configuration.controlOperatorUserIds,
+      CONTROL_OPERATOR_ROLE_IDS: configuration.controlOperatorRoleIds,
+      CONTROL_ELEVATED_USER_IDS: configuration.controlElevatedUserIds,
+      CONTROL_ELEVATED_ROLE_IDS: configuration.controlElevatedRoleIds,
+      RELAY_INGRESS_ENDPOINT: configuration.relayIngressEndpoint,
+      RELAY_INGRESS_HMAC_SECRET: configuration.relayIngressHmacSecret
     };
     if (configuration.agentPreviousAuthSecret !== undefined) {
       envVars.AGENT_PREVIOUS_AUTH_SECRET = configuration.agentPreviousAuthSecret;
@@ -152,6 +185,17 @@ function startupConfiguration(env: Env): AgentStartConfiguration {
     prefixCommandsEnabled: env.PREFIX_COMMANDS_ENABLED,
     targetApproverUserIds: env.TARGET_APPROVER_USER_IDS,
     tenantId: env.TENANT_ID,
+    controlRelayEnabled: env.CONTROL_RELAY_ENABLED,
+    controlRelayOnly: env.CONTROL_RELAY_ONLY,
+    controlRelayApplicationId: env.CONTROL_RELAY_APPLICATION_ID,
+    controlGuildId: env.CONTROL_GUILD_ID,
+    controlRelayChannelId: env.CONTROL_RELAY_CHANNEL_ID,
+    controlOperatorUserIds: env.CONTROL_OPERATOR_USER_IDS,
+    controlOperatorRoleIds: env.CONTROL_OPERATOR_ROLE_IDS,
+    controlElevatedUserIds: env.CONTROL_ELEVATED_USER_IDS,
+    controlElevatedRoleIds: env.CONTROL_ELEVATED_ROLE_IDS,
+    relayIngressEndpoint: env.RELAY_INGRESS_ENDPOINT,
+    relayIngressHmacSecret: env.RELAY_INGRESS_HMAC_SECRET,
     ...(env.AGENT_PREVIOUS_AUTH_SECRET === undefined
       ? {}
       : { agentPreviousAuthSecret: env.AGENT_PREVIOUS_AUTH_SECRET }),
@@ -175,7 +219,18 @@ function validateEnvironment(env: Env): VoiceHostMode {
     PREFIX_COMMANDS_ENABLED: env.PREFIX_COMMANDS_ENABLED,
     MESSAGE_CONTENT_INTENT_ENABLED: env.MESSAGE_CONTENT_INTENT_ENABLED,
     MANAGED_ROOMS_ENABLED: env.MANAGED_ROOMS_ENABLED,
-    MANAGED_GUILD_IDS: env.MANAGED_GUILD_IDS
+    MANAGED_GUILD_IDS: env.MANAGED_GUILD_IDS,
+    CONTROL_RELAY_ENABLED: env.CONTROL_RELAY_ENABLED,
+    CONTROL_RELAY_ONLY: env.CONTROL_RELAY_ONLY,
+    CONTROL_RELAY_APPLICATION_ID: env.CONTROL_RELAY_APPLICATION_ID,
+    CONTROL_GUILD_ID: env.CONTROL_GUILD_ID,
+    CONTROL_RELAY_CHANNEL_ID: env.CONTROL_RELAY_CHANNEL_ID,
+    CONTROL_OPERATOR_USER_IDS: env.CONTROL_OPERATOR_USER_IDS,
+    CONTROL_OPERATOR_ROLE_IDS: env.CONTROL_OPERATOR_ROLE_IDS,
+    CONTROL_ELEVATED_USER_IDS: env.CONTROL_ELEVATED_USER_IDS,
+    CONTROL_ELEVATED_ROLE_IDS: env.CONTROL_ELEVATED_ROLE_IDS,
+    RELAY_INGRESS_ENDPOINT: env.RELAY_INGRESS_ENDPOINT,
+    RELAY_INGRESS_HMAC_SECRET: env.RELAY_INGRESS_HMAC_SECRET
   });
   return voiceHostModeSchema.parse(env);
 }

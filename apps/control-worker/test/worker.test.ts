@@ -12,7 +12,8 @@ import { beforeAll, describe, expect, it } from "vitest";
 import {
   agentHandshakePayload,
   signAgentHandshake,
-  signCommandEnvelope
+  signCommandEnvelope,
+  signRelayIngress
 } from "@discord-vc-control/security";
 
 import { authorizeInteraction } from "../src/authorization.js";
@@ -55,6 +56,127 @@ async function openAgentSocket(stub: DurableObjectStub): Promise<WebSocket> {
   return socket;
 }
 
+const relaySecret = "test-relay-secret-with-at-least-32-bytes";
+
+function relayBody(overrides: Record<string, unknown> = {}): Record<string, unknown> {
+  return {
+    version: 1,
+    operation: "create",
+    deployment_id: env.DEPLOYMENT_ID,
+    tenant_id: env.TENANT_ID,
+    application_id: "100000000000000001",
+    source_message_id: "100000000000000090",
+    actor_user_id: "100000000000000004",
+    actor_role_ids: [],
+    control_guild_id: env.CONTROL_GUILD_ID,
+    control_channel_id: "100000000000000003",
+    content: "ordinary relay content",
+    ...overrides
+  };
+}
+
+async function relayFetch(
+  body: Record<string, unknown>,
+  input: { nonce?: string; rawBody?: string; signature?: string; timestamp?: number } = {}
+): Promise<Response> {
+  const rawBody = input.rawBody ?? JSON.stringify(body);
+  const timestamp = input.timestamp ?? Date.now();
+  const nonce = input.nonce ?? `${crypto.randomUUID()}${crypto.randomUUID()}`;
+  const signature =
+    input.signature ?? (await signRelayIngress({ nonce, rawBody, timestamp }, relaySecret));
+  return SELF.fetch("https://example.test/internal/relay-ingress", {
+    method: "POST",
+    headers: {
+      "content-type": "application/json",
+      "x-relay-nonce": nonce,
+      "x-relay-signature": signature,
+      "x-relay-timestamp": String(timestamp)
+    },
+    body: rawBody
+  });
+}
+
+async function makeAuthorizedLocalAgent(stub: DurableObjectStub): Promise<WebSocket> {
+  const socket = await openAgentSocket(stub);
+  await runInDurableObject(stub, async (instance, state) => {
+    const serverSocket = state.getWebSockets("agent")[0];
+    if (serverSocket === undefined) throw new Error("TEST_SERVER_SOCKET_MISSING");
+    await instance.webSocketMessage(
+      serverSocket,
+      JSON.stringify({
+        type: "status",
+        deployment_id: env.DEPLOYMENT_ID,
+        agent_kind: "authorized_local_rpc",
+        local_rpc_connected: true,
+        desired_connected: true,
+        observed_state: "CONNECTED",
+        gateway_connected: false,
+        voice_connected: true,
+        udp_established: false,
+        dave_established: false,
+        target_guild_id: "100000000000000020",
+        target_channel_id: "100000000000000021",
+        circuit_open: false,
+        retry_count: 0,
+        last_error_code: null,
+        last_health_at: Date.now()
+      })
+    );
+  });
+  socket.addEventListener("message", (event) => {
+    const message = JSON.parse(String(event.data)) as Record<string, unknown>;
+    if (
+      message.version !== 1 ||
+      (message.action !== "relay" && message.action !== "relay_cancel")
+    ) {
+      return;
+    }
+    const commandId = String(message.command_id);
+    const payload = message.payload as { request_id?: string };
+    const requestId = message.action === "relay" ? commandId : String(payload.request_id);
+    socket.send(
+      JSON.stringify({
+        type: "command_start",
+        command_id: commandId,
+        deployment_id: env.DEPLOYMENT_ID,
+        occurred_at: Date.now()
+      })
+    );
+    setTimeout(() => {
+      socket.send(
+        JSON.stringify({
+          type: "relay_status",
+          deployment_id: env.DEPLOYMENT_ID,
+          request_id: requestId,
+          command_id: requestId,
+          actor_user_id: "100000000000000004",
+          source_application_id: "100000000000000001",
+          source_message_id: "100000000000000090",
+          status: message.action === "relay" ? "PENDING_USER_APPROVAL" : "CANCELLED",
+          result_code: message.action === "relay" ? "PENDING_USER_APPROVAL" : "REQUEST_CANCELLED",
+          occurred_at: Date.now()
+        })
+      );
+      socket.send(
+        JSON.stringify({
+          type: "ack",
+          command_id: commandId,
+          accepted: true,
+          duplicate: false,
+          result_code: message.action === "relay" ? "PENDING_USER_APPROVAL" : "REQUEST_CANCELLED",
+          summary:
+            message.action === "relay"
+              ? "Waiting for local owner approval."
+              : "Cancelled before manual send.",
+          observed_state: "CONNECTED",
+          occurred_at: Date.now()
+        })
+      );
+    }, 0);
+  });
+  return socket;
+}
+
 describe("control worker", () => {
   it("serves only a minimal public health response", async () => {
     const response = await SELF.fetch("https://example.test/healthz");
@@ -73,6 +195,173 @@ describe("control worker", () => {
   it("requires internal authentication", async () => {
     const response = await SELF.fetch("https://example.test/internal/status");
     expect(response.status).toBe(401);
+  });
+
+  it("rejects relay ingress tampering, stale timestamps, and oversized bodies", async () => {
+    const body = relayBody();
+    const validRaw = JSON.stringify(body);
+    const nonce = `${crypto.randomUUID()}${crypto.randomUUID()}`;
+    const timestamp = Date.now();
+    const signature = await signRelayIngress({ nonce, rawBody: validRaw, timestamp }, relaySecret);
+    const tampered = await relayFetch(body, {
+      nonce,
+      timestamp,
+      signature,
+      rawBody: JSON.stringify({ ...body, content: "tampered" })
+    });
+    expect(tampered.status).toBe(401);
+    const stale = await relayFetch(body, { timestamp: Date.now() - 31_000 });
+    expect(stale.status).toBe(401);
+    const oversized = await relayFetch(body, { rawBody: "x".repeat(16 * 1024 + 1) });
+    expect(oversized.status).toBe(413);
+  });
+
+  it("rejects an offline local agent without retaining relay metadata or content", async () => {
+    await abortAllDurableObjects();
+    const response = await relayFetch(relayBody({ source_message_id: "100000000000000091" }));
+    expect(response.status).toBe(409);
+    await expect(response.json()).resolves.toMatchObject({ result_code: "LOCAL_AGENT_OFFLINE" });
+    const stored = await env.DB.prepare(
+      "SELECT COUNT(*) AS count FROM relay_requests WHERE source_message_id = ?"
+    )
+      .bind("100000000000000091")
+      .first<{ count: number }>();
+    expect(stored?.count).toBe(0);
+  });
+
+  it("enforces relay actor, elevation, guild, channel, application, and grammar", async () => {
+    await abortAllDurableObjects();
+    const stub = env.AGENT_SESSION.get(env.AGENT_SESSION.idFromName(env.DEPLOYMENT_ID));
+    const socket = await makeAuthorizedLocalAgent(stub);
+    for (const [override, code] of [
+      [{ actor_user_id: "100000000000000099" }, "RELAY_ACTOR_UNAUTHORIZED"],
+      [{ control_guild_id: "100000000000000099" }, "WRONG_CONTROL_GUILD"],
+      [{ control_channel_id: "100000000000000099" }, "WRONG_CONTROL_RELAY_CHANNEL"],
+      [{ application_id: "100000000000000099" }, "WRONG_RELAY_APPLICATION"],
+      [{ content: "/unknown" }, "INVALID_RELAY_GRAMMAR"],
+      [
+        { actor_user_id: "100000000000000005", content: "!voice ban 100000000000000099" },
+        "ELEVATED_OPERATOR_REQUIRED"
+      ]
+    ] as const) {
+      const response = await relayFetch(
+        relayBody({
+          ...override,
+          source_message_id: String(
+            BigInt("100000000000000100") + BigInt((Math.random() * 1000) | 0)
+          )
+        })
+      );
+      expect((await response.json<{ result_code: string }>()).result_code).toBe(code);
+    }
+    socket.close();
+  });
+
+  it("queues one metadata-only request and makes gateway reconnect delivery idempotent", async () => {
+    await abortAllDurableObjects();
+    const stub = env.AGENT_SESSION.get(env.AGENT_SESSION.idFromName(env.DEPLOYMENT_ID));
+    const socket = await makeAuthorizedLocalAgent(stub);
+    const body = relayBody({ source_message_id: "100000000000000190" });
+    const first = await relayFetch(body);
+    expect(first.status).toBe(200);
+    const firstResult = await first.json<{
+      accepted: boolean;
+      duplicate: boolean;
+      request_id: string;
+      result_code: string;
+    }>();
+    expect(firstResult).toMatchObject({
+      accepted: true,
+      duplicate: false,
+      result_code: "PENDING_USER_APPROVAL"
+    });
+    const duplicate = await relayFetch(body);
+    await expect(duplicate.json()).resolves.toMatchObject({
+      accepted: true,
+      duplicate: true,
+      request_id: firstResult.request_id
+    });
+    const stored = await env.DB.prepare(
+      `SELECT content_hash, content_length, status, result_code
+         FROM relay_requests WHERE request_id = ?`
+    )
+      .bind(firstResult.request_id)
+      .first<Record<string, unknown>>();
+    expect(stored).toMatchObject({
+      content_length: "ordinary relay content".length,
+      status: "PENDING_USER_APPROVAL",
+      result_code: "PENDING_USER_APPROVAL"
+    });
+    expect(JSON.stringify(stored)).not.toContain("ordinary relay content");
+    const replayNonce = `${crypto.randomUUID()}${crypto.randomUUID()}`;
+    const replayBody = relayBody({ source_message_id: "100000000000000191" });
+    const rawReplayBody = JSON.stringify(replayBody);
+    const replayTimestamp = Date.now();
+    const replaySignature = await signRelayIngress(
+      { nonce: replayNonce, rawBody: rawReplayBody, timestamp: replayTimestamp },
+      relaySecret
+    );
+    expect(
+      (
+        await relayFetch(replayBody, {
+          nonce: replayNonce,
+          rawBody: rawReplayBody,
+          signature: replaySignature,
+          timestamp: replayTimestamp
+        })
+      ).status
+    ).toBe(200);
+    const replay = await relayFetch(replayBody, {
+      nonce: replayNonce,
+      rawBody: rawReplayBody,
+      signature: replaySignature,
+      timestamp: replayTimestamp
+    });
+    await expect(replay.json()).resolves.toMatchObject({ result_code: "RELAY_NONCE_REPLAY" });
+    socket.close();
+  });
+
+  it("keeps status content-free and permits cancellation only to the originator or elevation", async () => {
+    await abortAllDurableObjects();
+    const stub = env.AGENT_SESSION.get(env.AGENT_SESSION.idFromName(env.DEPLOYMENT_ID));
+    const socket = await makeAuthorizedLocalAgent(stub);
+    const created = await relayFetch(relayBody({ source_message_id: "100000000000000192" }));
+    const createdResult = await created.json<{ request_id: string }>();
+    const denied = await relayFetch(
+      relayBody({
+        operation: "cancel",
+        request_id: createdResult.request_id,
+        source_message_id: "100000000000000193",
+        actor_user_id: "100000000000000005",
+        content: undefined
+      })
+    );
+    expect(denied.status).toBe(403);
+    const status = await relayFetch(
+      relayBody({
+        operation: "status",
+        request_id: createdResult.request_id,
+        source_message_id: "100000000000000194",
+        content: undefined
+      })
+    );
+    const statusText = await status.text();
+    expect(statusText).toContain("PENDING_USER_APPROVAL");
+    expect(statusText).not.toContain("ordinary relay content");
+    const cancelled = await relayFetch(
+      relayBody({
+        operation: "cancel",
+        request_id: createdResult.request_id,
+        source_message_id: "100000000000000195",
+        content: undefined
+      })
+    );
+    await expect(cancelled.json()).resolves.toMatchObject({
+      accepted: true,
+      status: "CANCELLED",
+      result_code: "REQUEST_CANCELLED"
+    });
+    socket.close();
   });
 
   it("uses server receipt time for heartbeat freshness", async () => {
@@ -610,8 +899,10 @@ describe("control worker", () => {
     expect(events).toHaveLength(50);
     expect(events.some((event) => event.action === "expired")).toBe(false);
     const receiptCount = await env.DB.prepare(
-      "SELECT COUNT(*) AS count FROM command_receipts"
-    ).first<{ count: number }>();
+      "SELECT COUNT(*) AS count FROM command_receipts WHERE expires_at <= ?"
+    )
+      .bind(Date.now())
+      .first<{ count: number }>();
     expect(receiptCount?.count).toBe(0);
   });
 });

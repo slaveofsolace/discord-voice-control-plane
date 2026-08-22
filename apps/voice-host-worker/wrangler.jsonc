@@ -9,7 +9,7 @@
     "head_sampling_rate": 1
   },
   "secrets": {
-    "required": ["DISCORD_BOT_TOKEN", "AGENT_AUTH_SECRET"]
+    "required": ["DISCORD_BOT_TOKEN", "AGENT_AUTH_SECRET", "RELAY_INGRESS_HMAC_SECRET"]
   },
   "containers": [
     {
@@ -59,6 +59,16 @@
     "MANAGED_ROOMS_ENABLED": "false",
     "MANAGED_GUILD_IDS": "",
     "TARGET_APPROVER_USER_IDS": "",
+    "CONTROL_RELAY_ENABLED": "false",
+    "CONTROL_RELAY_ONLY": "false",
+    "CONTROL_RELAY_APPLICATION_ID": "",
+    "CONTROL_GUILD_ID": "",
+    "CONTROL_RELAY_CHANNEL_ID": "",
+    "CONTROL_OPERATOR_USER_IDS": "",
+    "CONTROL_OPERATOR_ROLE_IDS": "",
+    "CONTROL_ELEVATED_USER_IDS": "",
+    "CONTROL_ELEVATED_ROLE_IDS": "",
+    "RELAY_INGRESS_ENDPOINT": "",
     "AGENT_KEY_ID": "local-v1",
     "PROBE_ENABLED": "false",
     "PROBE_GUILD_ID": "",

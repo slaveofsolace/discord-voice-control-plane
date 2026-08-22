@@ -8,12 +8,12 @@ const configurations: Record<
 > = {
   control: {
     config: "apps/control-worker/wrangler.jsonc",
-    requiredSecrets: ["AGENT_AUTH_SECRET", "INTERNAL_STATUS_SECRET"],
+    requiredSecrets: ["AGENT_AUTH_SECRET", "INTERNAL_STATUS_SECRET", "RELAY_INGRESS_HMAC_SECRET"],
     optionalSecrets: ["AGENT_PREVIOUS_AUTH_SECRET"]
   },
   "voice-host": {
     config: "apps/voice-host-worker/wrangler.jsonc",
-    requiredSecrets: ["DISCORD_BOT_TOKEN", "AGENT_AUTH_SECRET"],
+    requiredSecrets: ["DISCORD_BOT_TOKEN", "AGENT_AUTH_SECRET", "RELAY_INGRESS_HMAC_SECRET"],
     optionalSecrets: ["AGENT_PREVIOUS_AUTH_SECRET"]
   }
 };

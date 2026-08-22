@@ -26,6 +26,7 @@ describe("voice environment", () => {
     const parsed = voiceEnvironmentSchema.parse(base);
     expect(parsed.PREFIX_COMMANDS_ENABLED).toBe(false);
     expect(parsed.TARGET_APPROVER_USER_IDS.has("100000000000000001")).toBe(true);
+    expect(parsed.CONTROL_RELAY_ENABLED).toBe(false);
   });
 
   it("rejects prefix commands without the message-content intent", () => {
@@ -48,6 +49,35 @@ describe("voice environment", () => {
         AGENT_PREVIOUS_AUTH_SECRET: "y".repeat(32)
       })
     ).toMatchObject({ AGENT_PREVIOUS_KEY_ID: "v0" });
+  });
+
+  it("enables private relay intake only with Message Content and exact locked settings", () => {
+    const relay = {
+      ...base,
+      CONTROL_RELAY_ENABLED: "true",
+      CONTROL_RELAY_APPLICATION_ID: "100000000000000010",
+      CONTROL_GUILD_ID: "100000000000000011",
+      CONTROL_RELAY_CHANNEL_ID: "100000000000000012",
+      CONTROL_OPERATOR_USER_IDS: "100000000000000013",
+      RELAY_INGRESS_ENDPOINT: "https://example.test/internal/relay-ingress",
+      RELAY_INGRESS_HMAC_SECRET: "r".repeat(32)
+    };
+    expect(() => voiceEnvironmentSchema.parse(relay)).toThrow("MESSAGE_CONTENT_INTENT_ENABLED");
+    expect(
+      voiceEnvironmentSchema.parse({
+        ...relay,
+        MESSAGE_CONTENT_INTENT_ENABLED: "true",
+        CONTROL_RELAY_ONLY: "true"
+      })
+    ).toMatchObject({ CONTROL_RELAY_ENABLED: true, CONTROL_RELAY_ONLY: true });
+    expect(() =>
+      voiceEnvironmentSchema.parse({
+        ...relay,
+        MESSAGE_CONTENT_INTENT_ENABLED: "true",
+        CONTROL_RELAY_ONLY: "true",
+        PREFIX_COMMANDS_ENABLED: "true"
+      })
+    ).toThrow("Relay-only mode");
   });
 
   it("rejects reused current and previous rotation credentials", () => {
@@ -87,6 +117,28 @@ describe("control environment", () => {
         INTERNAL_STATUS_SECRET: "short"
       })
     ).toThrow();
+  });
+
+  it("keeps relay ingress disabled by default and fails closed when enabled incompletely", () => {
+    const valid = {
+      DEPLOYMENT_ID: "test",
+      TENANT_ID: "test",
+      CONTROL_DISCORD_APPLICATION_ID: "100000000000000001",
+      CONTROL_DISCORD_PUBLIC_KEY: "00".repeat(32),
+      CONTROL_GUILD_ID: "100000000000000002",
+      CONTROL_CHANNEL_IDS: "100000000000000003",
+      CONTROL_OPERATOR_USER_IDS: "100000000000000004",
+      CONTROL_OPERATOR_ROLE_IDS: "",
+      CONTROL_ELEVATED_USER_IDS: "100000000000000004",
+      CONTROL_ELEVATED_ROLE_IDS: "",
+      AGENT_KEY_ID: "v1",
+      AGENT_AUTH_SECRET: "a".repeat(32),
+      INTERNAL_STATUS_SECRET: "s".repeat(32)
+    };
+    expect(controlEnvironmentSchema.parse(valid).CONTROL_RELAY_ENABLED).toBe(false);
+    expect(() =>
+      controlEnvironmentSchema.parse({ ...valid, CONTROL_RELAY_ENABLED: "true" })
+    ).toThrow("Enabled relay ingress");
   });
 });
 
