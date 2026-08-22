@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Corrected `/voice-admin authorize-target` so an exact configured target approver is not accidentally blocked by the unrelated managed-room permission gate; all administration subcommands remain runtime-authorized.
+
 - Added the interaction-only VC Control application and its signed Cloudflare Worker endpoint.
 - Added the official Voice Rooms bot with slash commands and opt-in `!voice` and `!v` commands.
 - Added managed-room ownership, channel-scoped ACLs, 15-second empty-room cleanup, and exact target authorization.

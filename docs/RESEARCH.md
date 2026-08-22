@@ -21,9 +21,9 @@ Checked on 2026-08-22.
 
 ## Unresolved live facts
 
-- Authorized browser UI selected the intended personal Cloudflare account and showed Free as the current Workers plan. Container deployment is `BLOCKED` until the owner authorizes and completes Workers Paid.
+- Authorized browser UI selected the intended personal Cloudflare account and opened Workers Paid checkout. It shows $5 due today, then $5/month plus metered usage. Both billing-consent boxes and Activate remain untouched, so Container deployment is `BLOCKED` until the owner authorizes and completes the upgrade.
 - A read-only `wrangler containers list` check against the selected personal account returned: `Unauthorized: You do not have access to Cloudflare Containers. Deploying containers requires the Workers Paid plan.` No account ID is stored in this repository.
 - The updated authorized Computer component is functional. Authenticated live UI created the private `VC Control Lab` server, `voice-control`, and `voice-probe` without creating an invite or adding another member.
-- `VC Control` is prefilled in Discord's new-application dialog. Neither Discord application identity has been created, and no client secret, bot token, privileged intent, installation grant, registered command, Gateway session, or voice session has been observed.
+- `VC Control` is prefilled and the developer terms box is selected in Discord's new-application dialog, but Create was not pressed. Neither Discord application identity has been created, and no client secret, bot token, privileged intent, installation grant, registered command, Gateway session, or voice session has been observed.
 - No Discord Gateway, UDP discovery, DAVE session, test-guild command, or Socialize result has been observed.
 - Socialize is `BLOCKED` because staff approval, an approved window, approved application and bot IDs, guild ID, and exact target ID have not been supplied. Deletion behavior remains `UNVERIFIED` until an authorized live observation.

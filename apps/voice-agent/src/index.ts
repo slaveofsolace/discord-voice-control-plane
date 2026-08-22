@@ -24,6 +24,7 @@ import { redactSecrets } from "@discord-vc-control/security";
 import { AgentClient } from "./agent-client.js";
 import { ManagedRoomService } from "./managed-rooms.js";
 import { parsePrefixCommand, voiceSubcommands, type VoiceSubcommand } from "./prefix.js";
+import { asVoiceAdminSubcommand, requiresManageChannels } from "./voice-admin-authorization.js";
 import { VoiceController } from "./voice-controller.js";
 
 const environment = voiceEnvironmentSchema.parse(process.env);
@@ -203,10 +204,13 @@ client.on(Events.InteractionCreate, (interaction) => {
         await interaction.editReply({ content, allowedMentions: { parse: [] } });
         return;
       }
-      if (!member.permissions.has(PermissionFlagsBits.ManageChannels)) {
+      const subcommand = asVoiceAdminSubcommand(interaction.options.getSubcommand(true));
+      if (
+        requiresManageChannels(subcommand) &&
+        !member.permissions.has(PermissionFlagsBits.ManageChannels)
+      ) {
         throw new Error("MANAGE_CHANNELS_REQUIRED");
       }
-      const subcommand = interaction.options.getSubcommand(true);
       let content: string;
       if (subcommand === "setup") {
         const config = await managedRooms.setup(member.guild, member);

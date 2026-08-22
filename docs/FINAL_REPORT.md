@@ -46,9 +46,9 @@ Cloudflare Container hosting is accepted only if the dedicated probe passes ever
 
 ## 6. Verification Evidence
 
-- `UNIT TESTED`: clean `pnpm verify` passed formatting, typed lint, strict typecheck, all eight workspace builds, and 77 package tests across 14 files.
+- `UNIT TESTED`: clean `pnpm verify` passed formatting, typed lint, strict typecheck, all eight workspace builds, and 80 package tests across 15 files.
 - `INTEGRATION TESTED`: 13 migration-backed Workers, Durable Object, D1, alarm, outbox, restart, authorization, and configuration tests passed.
-- `UNIT TESTED`: copy triage passed across 22 files; secret scanning passed across 113 candidate files; the high-severity dependency audit reported no known vulnerabilities.
+- `UNIT TESTED`: copy triage passed across 22 files; secret scanning passed across 115 candidate files; the high-severity dependency audit reported no known vulnerabilities.
 - `UNIT TESTED`: all three Worker bundles passed Wrangler dry-runs. The two Container-backed Workers were bundled locally with Container rollout disabled because Docker is unavailable on this machine.
 - `INTEGRATION TESTED`: GitHub Actions runs `32551597849` and `32551599391` passed the complete verification, both Docker image builds, scans, dependency audit, and control Worker dry-run at commit `180abd0594980d0dbcaeddfa5cab53914bb54016`.
 - `INTEGRATION TESTED`: main-branch run `32552515725` passed the same repository and image-construction gates at commit `0f52c5332f1dbdb17fd04438e4e918a94c26fad9`.
@@ -59,9 +59,9 @@ Cloudflare Container hosting is accepted only if the dedicated probe passes ever
 
 The control Worker, D1 database, Durable Object, private voice host, and probe are not deployed. No live URL, production database ID, Container revision, probe report, or rollback exercise exists.
 
-Cloudflare voice deployment is `BLOCKED`. Authorized UI selected the intended personal account and confirmed that Free is current while Workers Paid supplies Container access. The owner must authorize and complete that upgrade before deployment. Billing was not automated, and no account ID or billing detail is committed.
+Cloudflare voice deployment is `BLOCKED`. Authorized UI opened Workers Paid checkout on the intended personal account. It shows $5 due today, then $5/month plus metered usage; both consent boxes and Activate remain untouched. The owner must authorize and complete the upgrade before deployment. Billing was not automated, and no account ID or billing detail is committed.
 
-The private `VC Control Lab` server, `voice-control`, and `voice-probe` now exist and were observed in authenticated live UI. The two application identities and every command, Gateway, voice, intent, credential, and permission path remain `UNVERIFIED`. Authorized Computer control is functional, but it remains paused before persistent application creation; login, MFA, CAPTCHA, credential display, token copying, security prompts, permission confirmation, and payment steps retain their protected boundaries.
+The private `VC Control Lab` server, `voice-control`, and `voice-probe` now exist and were observed in authenticated live UI. The `VC Control` creation form is ready with its developer terms box selected, but Create was not pressed. The two application identities and every command, Gateway, voice, intent, credential, and permission path remain `UNVERIFIED`. Login, MFA, CAPTCHA, credential display, token copying, security prompts, permission confirmation, and payment steps retain their protected boundaries.
 
 ## 8. Target-Guild State
 

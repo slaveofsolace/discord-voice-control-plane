@@ -22,7 +22,9 @@ describe("Discord application command definitions", () => {
   });
 
   it("publishes only the fixed administration surface", () => {
-    const names = voiceAdminCommand.toJSON().options?.map((option) => option.name);
+    const command = voiceAdminCommand.toJSON();
+    const names = command.options?.map((option) => option.name);
     expect(names).toEqual(["setup", "status", "enable", "disable", "authorize-target"]);
+    expect(command.default_member_permissions).toBeUndefined();
   });
 });

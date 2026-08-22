@@ -1,6 +1,7 @@
 import {
   ChannelType,
   Collection,
+  PermissionFlagsBits,
   type Guild,
   type GuildMember,
   type VoiceChannel
@@ -182,6 +183,28 @@ describe("managed room commands", () => {
         text_channel_id: channelId,
         authorized_by_user_id: ownerId
       }
+    });
+  });
+
+  it("accepts an exact target approver without granting managed-room administration", () => {
+    const { bootstrap, channel, guild, owner } = fixture();
+    const events: unknown[] = [];
+    const service = new ManagedRoomService({
+      deploymentId: "test",
+      managedGuildIds: new Set([guildId]),
+      managedRoomsEnabled: true,
+      onEvent: (event) => events.push(event),
+      prefixCommandsEnabled: true,
+      targetApproverUserIds: new Set([ownerId])
+    });
+    service.applyBootstrap(bootstrap);
+
+    expect(owner.permissions.has(PermissionFlagsBits.ManageChannels)).toBe(false);
+    expect(owner.permissions.has(PermissionFlagsBits.ManageGuild)).toBe(false);
+    service.authorizeTarget(guild as unknown as Guild, owner, channel);
+    expect(events.at(-1)).toMatchObject({
+      type: "authorized_target_event",
+      target: { authorized_by_user_id: ownerId, voice_channel_id: channelId }
     });
   });
 

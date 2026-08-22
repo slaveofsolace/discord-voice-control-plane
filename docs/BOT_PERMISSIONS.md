@@ -27,6 +27,8 @@ Permission integer: `286329872`. Verify it against the current Discord permissio
 
 Never request Administrator, Manage Guild, Kick Members, Ban Members, Manage Webhooks, Mute Members, Deafen Members, or priority/speaking permissions.
 
+The human permission used to invoke an administration command is separate from the bot installation profile. Managed-room administration requires Manage Channels. Exact target authorization requires either a configured `TARGET_APPROVER_USER_IDS` match or the invoking staff member's Manage Guild permission; this does not grant Manage Guild to the bot.
+
 ## Gateway intents
 
 Always: Guilds and Guild Voice States.

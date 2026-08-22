@@ -27,7 +27,7 @@ Create a private guild named `VC Control Lab` and two applications:
 
 Ordinary already-authenticated portal setup may use authorized Computer control. Stop for login, MFA, CAPTCHA, security or privacy prompts, permission confirmation, client-secret display, or bot-token display. The user completes those steps.
 
-Current live checkpoint: authorized Computer control is functional and created the private `VC Control Lab` server, `voice-control`, and `voice-probe`. The `VC Control` name is prefilled in Discord's new-application dialog. Application creation, credential display, privileged intent changes, and permission grants remain protected action-time steps.
+Current live checkpoint: authorized Computer control is functional and created the private `VC Control Lab` server, `voice-control`, and `voice-probe`. The `VC Control` name is prefilled and the developer terms box is selected in Discord's new-application dialog, but Create was not pressed. Application creation, credential display, privileged intent changes, and permission grants remain protected action-time steps.
 
 Record application, guild, channel, user, and role IDs in a local ignored environment file. Do not commit them as deployment facts.
 
@@ -84,9 +84,11 @@ Set `MANAGED_ROOMS_ENABLED=true` only for the private managed-room proof. Put ea
 
 Use `/voice-admin setup`, inspect the created category and channels, then `/voice-admin enable`. Use `/voice-admin authorize-target` only on the exact approved voice channel. A newly authorized external guild receives the presence-only profile unless it is also in the managed-guild allowlist.
 
+Set `TARGET_APPROVER_USER_IDS` to the exact staff IDs allowed to run `authorize-target` without broader guild administration. The other `/voice-admin` subcommands still require Manage Channels. The command is intentionally registered without a blanket Discord `default_member_permissions` value because that field cannot represent the exact user allowlist; the bot enforces each subcommand at runtime.
+
 ## 5. Cloudflare Container gate
 
-Current blocker: authorized UI selected the intended personal Cloudflare account and confirmed that Free is current while Workers Paid supplies Container access. The owner must authorize and complete that upgrade before deployment. Do not commit the account ID or billing data. No script in this repository performs a billing action.
+Current blocker: authorized UI selected the intended personal Cloudflare account and opened the Workers Paid checkout. It shows a $5 base charge due today, then $5 per month plus metered overages. Both billing-consent boxes and Activate remain untouched. The owner must authorize and complete that upgrade before deployment. Do not commit the account ID or billing data. No script in this repository performs a billing action.
 
 After that approval:
 

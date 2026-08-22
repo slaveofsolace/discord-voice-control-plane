@@ -3,7 +3,7 @@
   "ledger_id": "discord_voice_control",
   "created_at": "2026-08-21T23:00:00-05:00",
   "depth": "DEEP",
-  "iteration": 5,
+  "iteration": 6,
   "root": {
     "kind": "DECISION",
     "node_id": "root_node",
@@ -41,7 +41,7 @@
         "summary": "Pass static, unit, integration, private-guild, DAVE, UDP, lifecycle, security, and evidence gates without unsupported claims.",
         "knowledge": "KNOWN",
         "load_bearing": true,
-        "claim_ids": ["claim_unknown"],
+        "claim_ids": ["claim_unknown", "claim_target_approver_boundary"],
         "unknown_disposition": "Private-guild and target-guild runtime acceptance remain open until credentials and approved windows exist."
       },
       "mechanism": {
@@ -52,10 +52,10 @@
         "unknown_disposition": "Container UDP, DAVE, and lifecycle behavior require live proof."
       },
       "current_state_history": {
-        "summary": "The hardened implementation is published on a clean main-only remote at checkpoint ce973bb; the private VC Control Lab server and requested channels now exist; both Discord applications and every live runtime gate remain open; SOL Tools remained dirty and protected.",
+        "summary": "The hardened implementation is published on a main-only remote at checkpoint 08802d0; the current verified correction preserves the exact target-approver allowlist; the private VC Control Lab server and requested channels exist; both Discord applications and every live runtime gate remain open; SOL Tools remained dirty and protected.",
         "knowledge": "KNOWN",
         "load_bearing": true,
-        "claim_ids": ["claim_live_setup", "claim_unknown"],
+        "claim_ids": ["claim_live_setup", "claim_target_approver_boundary", "claim_unknown"],
         "unknown_disposition": "Recheck branch, HEAD, credentials, account plan, and live app state before external actions."
       },
       "people_incentives": {
@@ -80,7 +80,7 @@
         "owner": "User and target-guild staff",
         "status": "PRESERVED",
         "hard_gate": true,
-        "evidence_ids": ["ev_local_verify"]
+        "evidence_ids": ["ev_local_verify", "ev_target_approver_regression"]
       }
     ],
     "dependencies": [],
@@ -221,6 +221,17 @@
       }
     },
     {
+      "id": "claim_target_approver_boundary",
+      "label": "MEASURED",
+      "statement": "The voice administration path now requires Manage Channels for managed-room administration while allowing an exact TARGET_APPROVER_USER_IDS match or a staff member with Manage Guild to authorize the stored target; the command has no blanket Discord permission value that would preempt that runtime decision.",
+      "evidence_ids": ["ev_target_approver_regression"],
+      "contradiction_claim_ids": [],
+      "confidence": {
+        "level": "HIGH",
+        "basis": "Focused authorization tests and the complete 80-test package suite exercise the gate mapping and exact allowlist path."
+      }
+    },
+    {
       "id": "claim_unknown",
       "label": "UNKNOWN",
       "statement": "Workers Paid enrollment, both Discord application identities and protected grants, private-guild behavior, Container UDP and DAVE lifecycle behavior, rollback, and Socialize retention remain unresolved.",
@@ -248,9 +259,19 @@
       "kind": "TEST_RESULT",
       "access": "GENERATED_CURRENT",
       "locator": "docs/TEST_EVIDENCE.md",
-      "captured_at": "2026-08-21T22:22:00-05:00",
-      "integrity": "Sanitized summary of frozen install, formatting, lint, typecheck, builds, 77 package tests, 13 Workers tests, wording, secret, dependency, skill, and deploy-bundle checks.",
+      "captured_at": "2026-08-22T01:33:11-05:00",
+      "integrity": "Sanitized summary of frozen install, formatting, lint, typecheck, builds, 80 package tests, 13 Workers tests, wording, secret, dependency, skill, and deploy-bundle checks.",
       "supports_claim_ids": ["claim_objective"],
+      "contradicts_claim_ids": []
+    },
+    {
+      "id": "ev_target_approver_regression",
+      "kind": "TEST_RESULT",
+      "access": "GENERATED_CURRENT",
+      "locator": "apps/voice-agent/src/voice-admin-authorization.test.ts",
+      "captured_at": "2026-08-22T01:33:11-05:00",
+      "integrity": "Current source and tests prove subcommand-specific authorization, an exact allowlisted target approver without Manage Channels or Manage Guild, no blanket default member permission, and a green full verification run.",
+      "supports_claim_ids": ["claim_objective", "claim_target_approver_boundary"],
       "contradicts_claim_ids": []
     },
     {
@@ -258,8 +279,8 @@
       "kind": "LOG",
       "access": "INSPECTED_CURRENT",
       "locator": "docs/RESEARCH.md#unresolved-live-facts",
-      "captured_at": "2026-08-22T01:10:35-05:00",
-      "integrity": "Sanitized current UI and prior Wrangler evidence: the personal account is selected, Free is current, and Containers require Workers Paid; account identifiers, billing data, and raw logs are excluded.",
+      "captured_at": "2026-08-22T01:33:11-05:00",
+      "integrity": "Sanitized current UI and prior Wrangler evidence: Workers Paid checkout is open at $5 due today, then $5/month plus usage; both consent boxes and Activate remain untouched; account identifiers, billing data, and raw logs are excluded.",
       "supports_claim_ids": ["claim_live_setup", "claim_unknown"],
       "contradicts_claim_ids": []
     },
@@ -268,8 +289,8 @@
       "kind": "MEASUREMENT",
       "access": "INSPECTED_CURRENT",
       "locator": "docs/TEST_EVIDENCE.md#current-checkpoint",
-      "captured_at": "2026-08-22T01:10:35-05:00",
-      "integrity": "Sanitized authenticated UI observation: VC Control Lab, voice-control, and voice-probe exist; VC Control is only prefilled and no credential was displayed or copied.",
+      "captured_at": "2026-08-22T01:33:11-05:00",
+      "integrity": "Sanitized authenticated UI observation: VC Control Lab, voice-control, and voice-probe exist; VC Control is prefilled and its developer terms box is selected, but Create was not pressed and no credential was displayed or copied.",
       "supports_claim_ids": ["claim_live_setup", "claim_unknown"],
       "contradicts_claim_ids": []
     },
@@ -288,14 +309,29 @@
       "kind": "LOG",
       "access": "GENERATED_CURRENT",
       "locator": "docs/COMPLETION_AUDIT.md#external-live-gates",
-      "captured_at": "2026-08-22T01:10:35-05:00",
-      "integrity": "Sanitized gate state: neither Discord application exists, Workers Paid is not enabled, and no credential or account identifier is recorded.",
+      "captured_at": "2026-08-22T01:33:11-05:00",
+      "integrity": "Sanitized gate state: neither Discord application exists, Workers Paid checkout is open but not activated, and no credential or account identifier is recorded.",
       "supports_claim_ids": ["claim_unknown"],
       "contradicts_claim_ids": []
     }
   ],
   "hypotheses": [],
-  "tests": [],
+  "tests": [
+    {
+      "id": "test_target_approver_boundary",
+      "question": "Can an exact configured target approver authorize the stored voice target without inheriting managed-room administration?",
+      "kind": "EXPERIMENT",
+      "discriminates_hypothesis_ids": [],
+      "predicted_outcomes": [],
+      "expected_decision_value": "MEDIUM",
+      "cost": "LOW",
+      "risk": "LOW",
+      "authorization_status": "AUTHORIZED",
+      "status": "PASS",
+      "evidence_ids": ["ev_target_approver_regression"],
+      "changes_decision_if": "A failure would block command registration and require redesigning the target-authorization surface before live setup."
+    }
+  ],
   "trace": {
     "bounds": {
       "max_depth": 6,
@@ -309,11 +345,49 @@
         "statement": "Implement and test the local system while preserving live-deployment and authority gates.",
         "claim_id": "claim_unknown",
         "depth": 0,
+        "terminal": false,
+        "closure_reason": "EXPANDED"
+      },
+      {
+        "id": "node_target_approver_visibility",
+        "kind": "CONSEQUENCE",
+        "statement": "Removing the blanket Discord command permission makes the runtime subcommand checks load-bearing for every voice administration invocation.",
+        "claim_id": "claim_target_approver_boundary",
+        "depth": 1,
         "terminal": true,
-        "closure_reason": "BOUNDED"
+        "closure_reason": "MONITORED"
       }
     ],
-    "edges": [],
+    "edges": [
+      {
+        "id": "edge_target_approver_visibility",
+        "relation": "FORWARD",
+        "source_node_id": "root_node",
+        "target_node_id": "node_target_approver_visibility",
+        "source_delta": "The blanket default member permission is removed from the shared voice administration command.",
+        "mechanism_status": "KNOWN",
+        "mechanism": "Discord no longer preempts an exact user allowlist, while the bot parses a fixed subcommand and requires Manage Channels or the narrower exact target-approver rule before mutation.",
+        "conditions": [
+          "The registered command definition matches the tested source.",
+          "The interaction reaches the official Voice Rooms bot in a guild."
+        ],
+        "lag": "At command registration and each subsequent invocation.",
+        "target_delta": "Allowlisted target approvers can reach authorize-target, and unauthorized or underprivileged callers are rejected by the runtime gate.",
+        "affected_refs": ["inv_authority"],
+        "supporting_claim_ids": ["claim_target_approver_boundary"],
+        "contradicting_claim_ids": [],
+        "detection": {
+          "signal": "Command-definition, gate-mapping, exact-allowlist, and full-suite tests remain green; live denied invocations are still required in VC Control Lab.",
+          "latency": "Immediate in local tests and one interaction response in the private guild.",
+          "failure_to_detect": "A future handler bypass could expose an administration mutation despite the command definition remaining unchanged."
+        },
+        "falsifier": "An unauthorized member completes any voice administration mutation, or an exact configured target approver is rejected solely for lacking Manage Channels.",
+        "confidence": {
+          "level": "HIGH",
+          "basis": "Current source and focused tests directly exercise the command definition, subcommand mapping, and exact service allowlist."
+        }
+      }
+    ],
     "feedback_loops": [],
     "thresholds": []
   },
@@ -324,18 +398,50 @@
     "rejected_options": [
       "Do not begin with Socialize or a production voice connection before private-guild and hosting proof."
     ],
-    "decision_claim_ids": ["claim_objective", "claim_live_setup", "claim_unknown"],
+    "decision_claim_ids": [
+      "claim_objective",
+      "claim_live_setup",
+      "claim_target_approver_boundary",
+      "claim_unknown"
+    ],
     "remaining_unknown_claim_ids": ["claim_unknown"],
     "human_owner": "Repository owner and authorized Discord or Cloudflare account owner",
-    "consecutive_stable_checks": 1,
+    "consecutive_stable_checks": 2,
     "reopen_trigger": "Re-evaluate architecture if current official APIs, the DAVE stack, Container UDP or lifecycle proof, or target-guild authorization contradicts the plan."
   },
-  "actions": [],
+  "actions": [
+    {
+      "id": "action_target_approver_boundary",
+      "description": "Replace the blanket voice-administration permission gate with subcommand-specific runtime authorization and add regression coverage.",
+      "status": "VERIFIED",
+      "authorization_status": "AUTHORIZED",
+      "authority_basis": "The user requested implementation of the exact target-approver allowlist and reusable managed-room bot in the isolated repository.",
+      "destructive": false,
+      "production": false,
+      "external_state_change": false,
+      "irreversible": false,
+      "monitoring": "The focused tests and complete local verification suite must remain green; private-guild authorization still requires live proof.",
+      "rollback": {
+        "kind": "TRUE_ROLLBACK",
+        "procedure": "Revert only the authorization helper, command definition, handler gate, regression tests, and matching documentation before any live command registration.",
+        "preconditions": ["No live voice command registration has used the changed definition."],
+        "verification": "Run the full verification suite and confirm the prior command JSON and handler behavior are restored.",
+        "evidence_ids": ["ev_target_approver_regression"],
+        "irreversible_residue": "None; this change has not been registered with Discord or deployed."
+      },
+      "recovery": {
+        "procedure": "Restore the subcommand-specific gate and rerun focused and full tests if a later change reintroduces the blanket permission conflict.",
+        "owner": "Repository maintainer",
+        "evidence_ids": ["ev_target_approver_regression"]
+      },
+      "mitigation_consequence_node_ids": ["node_target_approver_visibility"]
+    }
+  ],
   "verification": {
     "mechanism": {
       "status": "PASS",
       "signal": "Signed envelopes, replay, migration-backed Durable Object state, relay limits, managed rooms, voice state transitions, and agent WebSocket behavior pass local tests.",
-      "evidence_ids": ["ev_local_verify"],
+      "evidence_ids": ["ev_local_verify", "ev_target_approver_regression"],
       "rationale": "The local mechanism is exercised without treating mocks or local sockets as live Discord voice evidence."
     },
     "endpoint": {
@@ -347,7 +453,7 @@
     "guardrails": {
       "status": "PASS",
       "signal": "Authorization, least privilege, secret scanning, copy triage, relay suppression, redaction, and protected-root boundaries pass their recorded checks.",
-      "evidence_ids": ["ev_user_plan", "ev_local_verify"],
+      "evidence_ids": ["ev_user_plan", "ev_local_verify", "ev_target_approver_regression"],
       "rationale": "These checks support the local guardrail claim; live guild permissions remain separately unverified."
     },
     "recovery": {

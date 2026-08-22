@@ -1,4 +1,4 @@
-import { ChannelType, PermissionFlagsBits, SlashCommandBuilder } from "discord.js";
+import { ChannelType, SlashCommandBuilder } from "discord.js";
 
 export const voiceCommand = new SlashCommandBuilder()
   .setName("voice")
@@ -62,7 +62,6 @@ export const voiceCommand = new SlashCommandBuilder()
 export const voiceAdminCommand = new SlashCommandBuilder()
   .setName("voice-admin")
   .setDescription("Configure the authorized voice bot")
-  .setDefaultMemberPermissions(PermissionFlagsBits.ManageChannels)
   .addSubcommand((command) =>
     command.setName("setup").setDescription("Create or repair the managed-room category and lobby")
   )

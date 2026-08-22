@@ -28,6 +28,8 @@ The same actions are registered under `/voice`. Prefix user arguments accept onl
 
 `/voice-admin setup|status|enable|disable|authorize-target`
 
+`setup`, `status`, `enable`, and `disable` require the invoking member to have Manage Channels. `authorize-target` instead requires either the member's exact ID in `TARGET_APPROVER_USER_IDS` or the member's Manage Guild permission. Discord cannot encode that user allowlist in `default_member_permissions`, so the command definition has no blanket client-side permission gate; every subcommand is checked again by the bot.
+
 ## Control
 
 `/vc status|join|leave|reconnect|pause|resume|relay|diagnostics|audit`
