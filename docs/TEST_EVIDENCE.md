@@ -16,16 +16,19 @@ Evidence captured here must be sanitized. Raw command output stays under ignored
 | Gate                      | Result               | Evidence                                                                                     |
 | ------------------------- | -------------------- | -------------------------------------------------------------------------------------------- |
 | Frozen dependency install | `UNIT TESTED`        | `pnpm install --frozen-lockfile` passed with pnpm 11.19.0                                    |
-| Formatting and lint       | `UNIT TESTED`        | Prettier check and ESLint passed                                                             |
+| Clean-build verification  | `UNIT TESTED`        | `pnpm clean && pnpm verify` passed after deleting output and TypeScript build metadata       |
+| Formatting and lint       | `UNIT TESTED`        | Prettier check and typed ESLint passed from a clean build state                              |
 | Strict TypeScript build   | `UNIT TESTED`        | Strict typecheck and all eight workspace builds passed on Node 24.19.0                       |
 | Package test suite        | `UNIT TESTED`        | 62 tests passed across 12 files                                                              |
 | Workers integration suite | `INTEGRATION TESTED` | 9 migration-backed Worker, Durable Object, restart, alarm, replay, and D1 tests passed       |
 | Copy triage               | `UNIT TESTED`        | Project scanner passed; Anti-AI scanner reported zero candidates                             |
-| Secret scan               | `UNIT TESTED`        | Tracked and untracked candidate scan passed                                                  |
+| Secret scan               | `UNIT TESTED`        | Scan passed across 110 tracked and untracked candidate files                                 |
 | Dependency audit          | `UNIT TESTED`        | `pnpm audit --audit-level high` reported no known vulnerabilities                            |
 | Reusable Discord skill    | `UNIT TESTED`        | Canonical and installed copies validate and compare byte-for-byte                            |
 | Worker deploy bundles     | `UNIT TESTED`        | Control dry-run passed; host and probe Worker bundles passed with Container rollout disabled |
-| Docker image builds       | `UNVERIFIED` locally | Wrangler confirmed a Docker-compatible CLI is absent; CI image gates are configured          |
+| GitHub Actions            | `INTEGRATION TESTED` | Push run `32549335606` and PR run `32549337618` passed                                       |
+| Docker image builds       | `INTEGRATION TESTED` | Both images built in both green CI runs; construction remains unavailable locally            |
+| Docker/voice runtime      | `UNVERIFIED`         | No image was started on Cloudflare and no live voice transport was exercised                 |
 | Computer-assisted setup   | `BLOCKED`            | Helper failed before window discovery with missing kernel assets, OS error 3                 |
 | Discord application setup | `UNVERIFIED`         | Applications, credentials, permission confirmations, and private guild remain manual         |
 | Cloudflare control deploy | `UNVERIFIED`         | No live Worker URL, D1 database, or Durable Object deployment                                |
