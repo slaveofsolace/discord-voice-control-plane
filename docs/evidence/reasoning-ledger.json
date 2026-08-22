@@ -292,7 +292,7 @@
       "access": "GENERATED_CURRENT",
       "locator": "docs/TEST_EVIDENCE.md",
       "captured_at": "2026-08-22T09:13:31Z",
-      "integrity": "Sanitized summary of frozen install, formatting, lint, typecheck, eight builds, 93 package tests, 18 Workers tests, wording, 120-file secret scan, dependency audit, skill parity, and current control/combined-host deploy-bundle checks.",
+      "integrity": "Sanitized summary of frozen install, formatting, lint, typecheck, eight builds, 101 package tests across 17 files, 18 Workers tests, wording, 122-file secret scan, dependency audit, skill parity, and current control/combined-host deploy-bundle checks.",
       "supports_claim_ids": ["claim_objective"],
       "contradicts_claim_ids": []
     },

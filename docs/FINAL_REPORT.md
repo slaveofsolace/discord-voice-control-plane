@@ -46,12 +46,12 @@ Cloudflare Container hosting is accepted only if the dedicated probe passes ever
 
 ## 6. Verification Evidence
 
-- `UNIT TESTED`: clean `pnpm verify` passed formatting, typed lint, strict typecheck, all eight workspace builds, and 93 package tests across 16 files.
+- `UNIT TESTED`: clean `pnpm verify` passed formatting, typed lint, strict typecheck, all eight workspace builds, and 101 package tests across 17 files.
 - `INTEGRATION TESTED`: 18 migration-backed Workers, Durable Object, D1, interaction-replay, execution-ledger, heartbeat, outbox, restart, authorization, and configuration tests passed.
-- `UNIT TESTED`: copy triage passed across 22 files; secret scanning passed across 116 candidate files; the high-severity dependency audit reported no known vulnerabilities.
+- `UNIT TESTED`: copy triage passed across 22 files; secret scanning passed across 122 candidate files; the high-severity dependency audit reported no known vulnerabilities.
 - `INTEGRATION TESTED`: a standard source-only security review reported 14 findings against the prior revision. The current source remediates all 14 and passes focused regressions plus the complete clean gate; live Discord and Cloudflare behavior remains separately unverified.
 - `UNIT TESTED`: the current control and combined voice-host/probe bundles passed Wrangler dry-runs. Container rollout was disabled for the host dry-run because Docker is unavailable on this machine.
-- `INTEGRATION TESTED`: the last published main-branch workflow passed the complete repository and Docker image-construction gates. The remediated revision requires the same green result before final handoff.
+- `INTEGRATION TESTED`: published `main` commit `3780f4a` passed run `32566678045`, including the complete repository, both Docker image-construction gates, and the control Worker bundle.
 - `UNIT TESTED`: the canonical and installed `authorized-discord-bot-ops` skill copies validate and match byte-for-byte.
 - `UNVERIFIED`: the private test server and requested channels are observed, but no live Discord application, command, voice transport, Cloudflare Container, or target-guild behavior is counted by these results.
 
