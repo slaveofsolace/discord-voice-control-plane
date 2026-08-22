@@ -123,7 +123,7 @@ Each complete report must prove:
 
 Any missing field fails the gate. Do not deploy the voice host on Cloudflare after a failed UDP, DAVE, native, restart, or lifecycle result; use the fallback section.
 
-If the operator machine has no Docker-compatible CLI, first deploy the private voice-host Worker with both host modes disabled and `--containers-rollout=none`, then connect that Worker to this repository through Cloudflare Workers Builds. Keep the production branch on `main` and use the full `wrangler deploy` path so Cloudflare's build environment publishes both Dockerfile images. Runtime secrets remain Worker secrets; build variables contain only the non-secret deployment configuration. A successful build does not replace the live probe.
+If the operator machine has no Docker-compatible CLI, first set both host modes false and `CONTAINERS_ROLLOUT=none`, then run `pnpm deploy:voice-host` to create the private Worker without publishing an image. Connect that Worker to this repository through Cloudflare Workers Builds. Keep the production branch on `main`, remove `CONTAINERS_ROLLOUT`, and use the full deployment script so Cloudflare's build environment publishes both Dockerfile images. Runtime secrets remain Worker secrets; build variables contain only the non-secret deployment configuration. A successful build does not replace the live probe.
 
 ## 6. Deploy the private voice host
 

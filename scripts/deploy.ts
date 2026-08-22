@@ -1,5 +1,7 @@
 import { spawn } from "node:child_process";
 
+import { containerRolloutArguments, deploymentSecretsArguments } from "./deploy-options.js";
+
 const service = process.argv[2];
 if (!new Set(["control", "voice-host"]).has(service ?? "")) {
   throw new Error("USAGE_DEPLOY_CONTROL_OR_VOICE_HOST");
@@ -39,11 +41,6 @@ function optionalVariable(name: string): string[] {
   return value ? ["--var", `${name}:${value}`] : [];
 }
 
-function deploymentSecretsArguments(): string[] {
-  const value = process.env.DEPLOY_SECRETS_FILE?.trim();
-  return value ? ["--secrets-file", value] : [];
-}
-
 if (service === "control") {
   const config = "apps/control-worker/wrangler.jsonc";
   const vars = [
@@ -61,7 +58,7 @@ if (service === "control") {
   ].flatMap((value) => ["--var", value]);
   vars.push(...optionalVariable("AGENT_PREVIOUS_KEY_ID"));
   const deploy = () =>
-    run(["deploy", "--config", config, ...deploymentSecretsArguments(), ...vars]);
+    run(["deploy", "--config", config, ...deploymentSecretsArguments(process.env), ...vars]);
   const migrate = () => run(["d1", "migrations", "apply", "DB", "--remote", "--config", config]);
   if (process.env.INITIAL_D1_PROVISION === "true") {
     await deploy();
@@ -96,7 +93,8 @@ if (service === "control") {
     "deploy",
     "--config",
     "apps/voice-host-worker/wrangler.jsonc",
-    ...deploymentSecretsArguments(),
+    ...deploymentSecretsArguments(process.env),
+    ...containerRolloutArguments(process.env),
     ...vars
   ]);
 }
