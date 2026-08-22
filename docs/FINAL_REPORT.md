@@ -46,7 +46,7 @@ Cloudflare Container hosting is accepted only if the dedicated probe passes ever
 
 ## 6. Verification Evidence
 
-- `UNIT TESTED`: clean `pnpm verify` passed formatting, typed lint, strict typecheck, all eight workspace builds, and 91 package tests across 15 files.
+- `UNIT TESTED`: clean `pnpm verify` passed formatting, typed lint, strict typecheck, all eight workspace builds, and 93 package tests across 16 files.
 - `INTEGRATION TESTED`: 18 migration-backed Workers, Durable Object, D1, interaction-replay, execution-ledger, heartbeat, outbox, restart, authorization, and configuration tests passed.
 - `UNIT TESTED`: copy triage passed across 22 files; secret scanning passed across 116 candidate files; the high-severity dependency audit reported no known vulnerabilities.
 - `INTEGRATION TESTED`: a standard source-only security review reported 14 findings against the prior revision. The current source remediates all 14 and passes focused regressions plus the complete clean gate; live Discord and Cloudflare behavior remains separately unverified.
@@ -61,7 +61,7 @@ Workers Paid is active on the selected test account. The control Worker, D1 data
 
 Cloudflare voice deployment is `UNVERIFIED`, not billing-blocked. Authenticated account UI shows Workers Paid as the current plan and Containers included. No Worker, D1 database, Durable Object, or Container has been deployed, and no account ID or billing detail is committed.
 
-The private `VC Control Lab` server, `voice-control`, and `voice-probe` exist and were observed in authenticated live UI. The owner confirmed official application creation and `VC Control` now exists; its public identifiers are stored only in an ignored local runtime file, and no credential was opened or copied. `Voice Rooms` creation is waiting on a second user-solved hCaptcha. Every command, Gateway, voice, intent, credential, and permission path remains `UNVERIFIED`. Login, MFA, CAPTCHA, credential display, token copying, security prompts, and permission confirmations retain their protected boundaries. The owner completed the Cloudflare payment step; authenticated UI shows Workers Paid as the current plan.
+The private `VC Control Lab` server, `voice-control`, and `voice-probe` exist and were observed in authenticated live UI. `VC Control` and `Voice Rooms` now exist; their public identifiers are stored only in an ignored local runtime file, and no credential was opened or copied. Every command, Gateway, voice, intent, credential, and permission path remains `UNVERIFIED`. Login, MFA, CAPTCHA, credential display, token copying, security prompts, privileged-intent changes, and permission confirmations retain their protected boundaries. The owner completed the Cloudflare payment step; authenticated UI shows Workers Paid as the current plan.
 
 During channel-ID inspection, Discord's `Open Chat` control unexpectedly joined the operator's user account to `voice-probe`. It was immediately disconnected; Discord displayed input error 3002 and no message was sent. This event is an operational incident, not bot, Gateway, UDP, DAVE, or hosting verification.
 
@@ -79,7 +79,7 @@ The conventional-host fallback uses the same voice-agent image and authenticated
 
 ## 10. Remaining Work
 
-1. After action-time approval, finish creating `VC Control` and `Voice Rooms`, handle protected credentials and permission confirmations, and complete the live private-guild command matrix in the existing `VC Control Lab` surface.
+1. Complete the protected Message Content, token, and permission steps for the two existing applications, then register commands and run the live private-guild command matrix in `VC Control Lab`.
 2. Deploy the control plane, run two fail-closed Container probe cycles, capture clean SIGTERM and distinct-run evidence, then choose Cloudflare or the documented conventional host from the result.
 3. Socialize staff completes `SOCIALIZE_INTAKE.md`. During the approved window, test only official-bot presence controls and one ordinary relay, then observe deletion without synthetic activity.
 4. Exercise rollback and credential rotation in the private environment. Until those actions occur, the corresponding labels remain `UNVERIFIED` or `BLOCKED`.

@@ -27,7 +27,9 @@ Create a private guild named `VC Control Lab` and two applications:
 
 Ordinary already-authenticated portal setup may use authorized Computer control. Stop for login, MFA, CAPTCHA, security or privacy prompts, permission confirmation, client-secret display, or bot-token display. The user completes those steps.
 
-Current live checkpoint: authorized Computer control created the private `VC Control Lab` server, `voice-control`, `voice-probe`, and `VC Control` application. The public application identifiers are retained only in an ignored local runtime file. `Voice Rooms` creation is waiting on a user-solved hCaptcha. Credential display, privileged intent changes, and permission grants remain protected action-time steps.
+Current live checkpoint: authorized Computer control created the private `VC Control Lab` server, `voice-control`, `voice-probe`, and `VC Control` application. The owner cleared Discord's hCaptcha and `Voice Rooms` now exists. Public application identifiers are retained only in an ignored local runtime file. Credential display, privileged-intent changes, and permission grants remain protected action-time steps.
+
+On Windows, run `pnpm secrets:local` before revealing either protected credential. The script first creates an ignored `.runtime/secrets` directory with access restricted to the current Windows account, then prompts without echo and writes the Voice Rooms bot token and VC Control client secret to `.runtime/secrets/discord.env`. It prints only the local path. Run a trusted repository command with `pnpm with:local-discord-secrets -- <command>` when those two environment variables are required. The wrapper does not print their values.
 
 Record application, guild, channel, user, and role IDs in a local ignored environment file. Do not commit them as deployment facts.
 

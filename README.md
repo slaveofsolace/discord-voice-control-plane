@@ -6,9 +6,9 @@ The project uses two Discord applications: an interaction-only `VC Control` app 
 
 ## Current status
 
-The current source passes strict type checking, 91 package tests, and 18 migration-backed Workers tests. Published `main` commit `61b71bd` passed GitHub Actions run `32561761269`, including the complete verification gate, secret scan, dependency audit, both Container image builds, and the control Worker bundle.
+The current source passes strict type checking, 93 package tests, and 18 migration-backed Workers tests. Published `main` commit `db3c80c` passed GitHub Actions run `32562460921`, including the complete verification gate, secret scan, dependency audit, both Container image builds, and the control Worker bundle.
 
-Discord and Cloudflare runtime behavior is not yet verified. The private `VC Control Lab` server and its `voice-control` and `voice-probe` channels exist. `VC Control` now exists as a Discord application; no credential was opened or copied. `Voice Rooms` creation is waiting on a second user-solved hCaptcha. Permission grants, commands, and voice remain unexercised. Workers Paid is active on the selected personal Cloudflare account, so billing no longer blocks Container deployment. The Socialize path is **BLOCKED** until staff supplies an approval reference, approved window, approved application and guild IDs, and the exact temporary voice channel. [Test evidence](docs/TEST_EVIDENCE.md) keeps those live claims separate from local and CI results.
+Discord and Cloudflare runtime behavior is not yet verified. The private `VC Control Lab` server and its `voice-control` and `voice-probe` channels exist. `VC Control` and `Voice Rooms` now exist as Discord applications; their public identifiers are stored only in an ignored local runtime file. No credential was opened or copied. The Message Content intent, bot token, installation grant, commands, and voice remain unexercised. Workers Paid is active on the selected personal Cloudflare account, so billing no longer blocks Container deployment. The Socialize path is **BLOCKED** until staff supplies an approval reference, approved window, approved application and guild IDs, and the exact temporary voice channel. [Test evidence](docs/TEST_EVIDENCE.md) keeps those live claims separate from local and CI results.
 
 ## Services
 

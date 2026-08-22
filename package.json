@@ -23,6 +23,8 @@
     "security:dependencies": "pnpm audit --audit-level high",
     "commands:control": "tsx scripts/register-control-commands.ts",
     "commands:voice": "tsx scripts/register-voice-commands.ts",
+    "secrets:local": "tsx scripts/store-local-discord-secrets.ts",
+    "with:local-discord-secrets": "tsx scripts/with-local-discord-secrets.ts",
     "secrets:control": "tsx scripts/configure-cloudflare-secrets.ts control",
     "secrets:voice-host": "tsx scripts/configure-cloudflare-secrets.ts voice-host",
     "deploy:control": "tsx scripts/deploy.ts control",

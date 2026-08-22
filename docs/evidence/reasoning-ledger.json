@@ -3,7 +3,7 @@
   "ledger_id": "discord_voice_control",
   "created_at": "2026-08-21T23:00:00-05:00",
   "depth": "DEEP",
-  "iteration": 9,
+  "iteration": 10,
   "root": {
     "kind": "DECISION",
     "node_id": "root_node",
@@ -52,7 +52,7 @@
         "unknown_disposition": "Container UDP, DAVE, and lifecycle behavior require live proof."
       },
       "current_state_history": {
-        "summary": "The hardened implementation adds durable interaction and execution replay controls, fail-closed reconciliation, managed-room race and ACL guards, and a single Worker token boundary; published main and exact-SHA CI are green; the private VC Control Lab server, requested channels, and VC Control application exist; Workers Paid is active; Voice Rooms creation is waiting on a user-solved hCaptcha; SOL Tools remained dirty and protected.",
+        "summary": "The hardened implementation adds durable interaction and execution replay controls, fail-closed reconciliation, managed-room race and ACL guards, and a single Worker token boundary; published main and exact-SHA CI are green; the private VC Control Lab server, requested channels, and both Discord applications exist; Workers Paid is active; protected intents, credentials, and grants remain open; SOL Tools remained dirty and protected.",
         "knowledge": "KNOWN",
         "load_bearing": true,
         "claim_ids": [
@@ -96,22 +96,23 @@
     "stakeholders": []
   },
   "authority": {
-    "scope": "Build, test, publish to main, and deploy the requested official-bot system; live credentials and target permissions remain human-reserved. The owner completed Workers Paid enrollment.",
+    "scope": "Build, test, publish to main, and deploy the requested official-bot system. The owner delegated ordinary already-authenticated Discord UI navigation and inspection to Computer control; live credentials, privileged-intent changes, and target permissions remain human-reserved. The owner completed Workers Paid enrollment.",
     "decision_owner": "Repository owner for implementation; target-guild staff for Socialize actions",
     "authorized_actions": [
       "Create and modify the isolated repository.",
       "Create the public GitHub repository, retain review history, publish verified commits to main, and delete the redundant task branch after exact ref checks.",
       "Deploy to the selected Cloudflare account after the user enables the required paid plan.",
-      "Perform ordinary authorized Discord UI setup while respecting confirmation gates."
+      "Perform ordinary already-authenticated Discord UI navigation and inspection while respecting confirmation gates."
     ],
     "forbidden_actions": [
       "Automate a normal Discord user account or use a user token.",
       "Generate synthetic activity or bypass inactivity policy.",
       "Expose secrets or change billing, security prompts, or target permissions for the user.",
-      "Delete a branch that has not been proved redundant with main or is unrelated to this task."
+      "Delete a branch that has not been proved redundant with main or is unrelated to this task.",
+      "Solve or bypass CAPTCHA, display or copy credentials through automation, or change in-app security, privacy, privileged-intent, or permission settings."
     ],
     "human_reserved_decisions": [
-      "Discord credential creation or revelation, permission confirmation, and Socialize installation approval."
+      "Discord CAPTCHA, credential creation or revelation, privileged-intent changes, permission confirmation, and Socialize installation approval."
     ],
     "external_state_allowed": true,
     "hard_gates": [
@@ -154,7 +155,7 @@
         "id": "gate_human",
         "category": "HUMAN_RESERVED",
         "status": "CLEAR",
-        "rationale": "Credential exposure, permissions, Socialize approval, and subjective acceptance have named human owners. The billing decision was completed by the owner.",
+        "rationale": "CAPTCHA, credential exposure, privileged intents, permissions, Socialize approval, and subjective acceptance have named human owners. The billing decision was completed by the owner.",
         "claim_ids": ["claim_unknown"]
       },
       {
@@ -220,9 +221,9 @@
     },
     {
       "id": "claim_live_setup",
-      "label": "OBSERVED",
-      "statement": "Authenticated live UI shows VC Control Lab with voice-control and voice-probe, a created VC Control application, and Workers Paid as the current Cloudflare plan; Voice Rooms creation is waiting on a second hCaptcha, and no credential, permission grant, or deployment exists yet.",
-      "evidence_ids": ["ev_live_setup", "ev_cloudflare_paid"],
+      "label": "MEASURED",
+      "statement": "Authenticated live UI shows VC Control Lab with voice-control and voice-probe, both Discord applications, and Workers Paid as the current Cloudflare plan; no credential, privileged-intent change, permission grant, or deployment exists yet.",
+      "evidence_ids": ["ev_live_setup", "ev_cloudflare_paid", "ev_voice_rooms_created"],
       "contradiction_claim_ids": [],
       "confidence": {
         "level": "HIGH",
@@ -237,7 +238,7 @@
       "contradiction_claim_ids": [],
       "confidence": {
         "level": "HIGH",
-        "basis": "Focused authorization tests and the complete 91-test package suite exercise the gate mapping and exact allowlist path."
+        "basis": "Focused authorization tests and the complete 93-test package suite exercise the gate mapping and exact allowlist path."
       }
     },
     {
@@ -248,18 +249,29 @@
       "contradiction_claim_ids": [],
       "confidence": {
         "level": "HIGH",
-        "basis": "The focused boundary test rejects a 30,001-millisecond lifetime and the complete 91-test package suite passes with the shared constant used by production and fixture code."
+        "basis": "The focused boundary test rejects a 30,001-millisecond lifetime and the complete 93-test package suite passes with the shared constant used by production and fixture code."
       }
     },
     {
       "id": "claim_unknown",
       "label": "UNKNOWN",
-      "statement": "Voice Rooms application creation is waiting on hCaptcha; both applications' protected grants, private-guild behavior, Container UDP and DAVE lifecycle behavior, rollback, and Socialize retention remain unresolved.",
-      "evidence_ids": ["ev_live_setup", "ev_runtime_prerequisites"],
+      "statement": "Both Discord applications exist; their protected intents, credentials and grants, private-guild behavior, Container UDP and DAVE lifecycle behavior, rollback, and Socialize retention remain unresolved.",
+      "evidence_ids": ["ev_live_setup", "ev_runtime_prerequisites", "ev_voice_rooms_created"],
       "contradiction_claim_ids": [],
       "confidence": {
         "level": "LOW",
-        "basis": "VC Control exists, but the confirmed Voice Rooms creation action reached Discord's human-verification gate; no live command, voice, permission, credential, or deployed Container evidence exists yet."
+        "basis": "Both applications now exist, but no live command, voice, permission, credential, or deployed Container evidence exists yet."
+      }
+    },
+    {
+      "id": "claim_automation_boundary",
+      "label": "OBSERVED",
+      "statement": "The owner delegated ordinary already-authenticated Discord setup to Computer control while CAPTCHA, credential display or copying, privileged-intent changes, and permission confirmations remain manual owner actions.",
+      "evidence_ids": ["ev_user_resume_decision"],
+      "contradiction_claim_ids": [],
+      "confidence": {
+        "level": "HIGH",
+        "basis": "The current user instruction is authoritative for task delegation and does not override the installed Discord and Computer safety boundaries."
       }
     }
   ],
@@ -279,8 +291,8 @@
       "kind": "TEST_RESULT",
       "access": "GENERATED_CURRENT",
       "locator": "docs/TEST_EVIDENCE.md",
-      "captured_at": "2026-08-22T03:11:00-05:00",
-      "integrity": "Sanitized summary of frozen install, formatting, lint, typecheck, eight builds, 91 package tests, 18 Workers tests, wording, 116-file secret scan, dependency audit, skill parity, and current control/combined-host deploy-bundle checks.",
+      "captured_at": "2026-08-22T09:13:31Z",
+      "integrity": "Sanitized summary of frozen install, formatting, lint, typecheck, eight builds, 93 package tests, 18 Workers tests, wording, 120-file secret scan, dependency audit, skill parity, and current control/combined-host deploy-bundle checks.",
       "supports_claim_ids": ["claim_objective"],
       "contradicts_claim_ids": []
     },
@@ -319,8 +331,8 @@
       "kind": "MEASUREMENT",
       "access": "INSPECTED_CURRENT",
       "locator": "docs/TEST_EVIDENCE.md#current-checkpoint",
-      "captured_at": "2026-08-22T01:33:11-05:00",
-      "integrity": "Sanitized authenticated UI observation: VC Control Lab, voice-control, voice-probe, and VC Control exist; public identifiers are retained only under ignored runtime state; Voice Rooms creation is waiting on a second hCaptcha; no credential was displayed or copied.",
+      "captured_at": "2026-08-22T09:00:11Z",
+      "integrity": "Sanitized authenticated UI observation: VC Control Lab, voice-control, voice-probe, VC Control, and Voice Rooms exist; public identifiers are retained only under ignored runtime state; no credential was displayed or copied.",
       "supports_claim_ids": ["claim_live_setup", "claim_unknown"],
       "contradicts_claim_ids": []
     },
@@ -340,8 +352,28 @@
       "access": "GENERATED_CURRENT",
       "locator": "docs/COMPLETION_AUDIT.md#external-live-gates",
       "captured_at": "2026-08-22T01:33:11-05:00",
-      "integrity": "Sanitized gate state: VC Control exists, Voice Rooms creation is waiting on a user-solved hCaptcha, Workers Paid is active, published main CI is green, and no credential or account identifier is committed.",
+      "integrity": "Sanitized gate state: both Discord applications exist, protected intents, credentials and grants remain open, Workers Paid is active, published main CI is green, and no credential or account identifier is committed.",
       "supports_claim_ids": ["claim_unknown"],
+      "contradicts_claim_ids": []
+    },
+    {
+      "id": "ev_voice_rooms_created",
+      "kind": "MEASUREMENT",
+      "access": "INSPECTED_CURRENT",
+      "locator": "docs/TEST_EVIDENCE.md#current-checkpoint",
+      "captured_at": "2026-08-22T09:00:11Z",
+      "integrity": "Sanitized authenticated Discord Developer Portal observation: Voice Rooms exists and its Bot page is available; its public application ID is retained only under ignored runtime state; no token was displayed or copied.",
+      "supports_claim_ids": ["claim_live_setup", "claim_unknown"],
+      "contradicts_claim_ids": []
+    },
+    {
+      "id": "ev_user_resume_decision",
+      "kind": "HUMAN_DECISION",
+      "access": "INSPECTED_CURRENT",
+      "locator": "docs/DECISIONS.md",
+      "captured_at": "2026-08-22T09:00:11Z",
+      "integrity": "Current user decision delegates ordinary setup to Computer control without expanding CAPTCHA, credential, privileged-intent, permission, or target-guild authority.",
+      "supports_claim_ids": ["claim_automation_boundary"],
       "contradicts_claim_ids": []
     }
   ],
@@ -473,9 +505,9 @@
     "thresholds": []
   },
   "decision": {
-    "iteration_choice": "ESCALATE",
-    "recommendation": "Preserve the completed private test surface, complete the protected Discord application identity and credential steps, then deploy the control plane and private probe before enabling the production voice host.",
-    "selected_action_ids": [],
+    "iteration_choice": "ACT",
+    "recommendation": "Continue ordinary Discord setup and local evidence capture, stop at the protected Message Content, token, and permission steps for the owner, then deploy the control plane and private probe before enabling the production voice host.",
+    "selected_action_ids": ["action_resume_ui_setup"],
     "rejected_options": [
       "Do not begin with Socialize or a production voice connection before private-guild and hosting proof."
     ],
@@ -484,14 +516,41 @@
       "claim_live_setup",
       "claim_target_approver_boundary",
       "claim_command_lifetime",
+      "claim_automation_boundary",
       "claim_unknown"
     ],
     "remaining_unknown_claim_ids": ["claim_unknown"],
     "human_owner": "Repository owner and authorized Discord or Cloudflare account owner",
-    "consecutive_stable_checks": 2,
+    "consecutive_stable_checks": 0,
     "reopen_trigger": "Re-evaluate architecture if current official APIs, the DAVE stack, Container UDP or lifecycle proof, or target-guild authorization contradicts the plan."
   },
   "actions": [
+    {
+      "id": "action_resume_ui_setup",
+      "description": "Continue ordinary already-authenticated Discord portal navigation and local public-identifier capture, stopping before protected intent, credential, or permission actions.",
+      "status": "AUTHORIZED",
+      "authorization_status": "AUTHORIZED",
+      "authority_basis": "The owner explicitly delegated ordinary setup to Computer control while the installed Discord and Computer skills retain protected human actions.",
+      "destructive": false,
+      "production": false,
+      "external_state_change": false,
+      "irreversible": false,
+      "monitoring": "Reinspect the exact portal page after each navigation step and stop if CAPTCHA, authentication, credential, security, privacy, privileged-intent, or permission UI appears.",
+      "rollback": {
+        "kind": "NONE",
+        "procedure": "No Discord state mutation is included in this bounded action.",
+        "preconditions": ["The authenticated Discord portal session remains available."],
+        "verification": "Confirm the current application and page identity before continuing.",
+        "evidence_ids": [],
+        "irreversible_residue": "None."
+      },
+      "recovery": {
+        "procedure": "Refresh the application list and reselect the single returned Discord Developer Portal window if the UI binding becomes stale.",
+        "owner": "Repository owner and authorized operator",
+        "evidence_ids": []
+      },
+      "mitigation_consequence_node_ids": []
+    },
     {
       "id": "action_target_approver_boundary",
       "description": "Replace the blanket voice-administration permission gate with subcommand-specific runtime authorization and add regression coverage.",
@@ -582,7 +641,7 @@
   },
   "closure": {
     "status": "OPEN",
-    "summary": "Implementation, documentation, local verification, exact-SHA CI, main publication, private server/channels, and the VC Control identity are complete. Voice Rooms creation is waiting on hCaptcha; Cloudflare deployment, private-guild command proof, rollback, and Socialize evidence remain externally blocked or unverified.",
+    "summary": "Implementation, documentation, local verification, exact-SHA CI, main publication, private server/channels, and both Discord application identities are complete. Protected intents, credentials and grants, Cloudflare deployment, private-guild command proof, rollback, and Socialize evidence remain externally blocked or unverified.",
     "residual_risks": [
       "Cloudflare Containers may fail a live UDP, DAVE, native-library, or lifecycle gate.",
       "Socialize may not approve installation or a supported retention mechanism."
