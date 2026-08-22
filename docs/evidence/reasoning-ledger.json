@@ -3,7 +3,7 @@
   "ledger_id": "discord_voice_control",
   "created_at": "2026-08-21T23:00:00-05:00",
   "depth": "DEEP",
-  "iteration": 6,
+  "iteration": 7,
   "root": {
     "kind": "DECISION",
     "node_id": "root_node",
@@ -41,21 +41,26 @@
         "summary": "Pass static, unit, integration, private-guild, DAVE, UDP, lifecycle, security, and evidence gates without unsupported claims.",
         "knowledge": "KNOWN",
         "load_bearing": true,
-        "claim_ids": ["claim_unknown", "claim_target_approver_boundary"],
+        "claim_ids": ["claim_unknown", "claim_target_approver_boundary", "claim_command_lifetime"],
         "unknown_disposition": "Private-guild and target-guild runtime acceptance remain open until credentials and approved windows exist."
       },
       "mechanism": {
         "summary": "Cloudflare HTTP interactions and Durable Object coordination drive a separately authenticated Discord Gateway and Container voice agent.",
         "knowledge": "KNOWN",
         "load_bearing": true,
-        "claim_ids": ["claim_unknown"],
+        "claim_ids": ["claim_unknown", "claim_command_lifetime"],
         "unknown_disposition": "Container UDP, DAVE, and lifecycle behavior require live proof."
       },
       "current_state_history": {
-        "summary": "The hardened implementation is published on a main-only remote at checkpoint 08802d0; the current verified correction preserves the exact target-approver allowlist; the private VC Control Lab server and requested channels exist; both Discord applications and every live runtime gate remain open; SOL Tools remained dirty and protected.",
+        "summary": "The hardened implementation preserves the exact target-approver allowlist and enforces a 30-second command lifetime; the private VC Control Lab server and requested channels exist; both Discord applications and every live runtime gate remain open; SOL Tools remained dirty and protected.",
         "knowledge": "KNOWN",
         "load_bearing": true,
-        "claim_ids": ["claim_live_setup", "claim_target_approver_boundary", "claim_unknown"],
+        "claim_ids": [
+          "claim_live_setup",
+          "claim_target_approver_boundary",
+          "claim_command_lifetime",
+          "claim_unknown"
+        ],
         "unknown_disposition": "Recheck branch, HEAD, credentials, account plan, and live app state before external actions."
       },
       "people_incentives": {
@@ -80,7 +85,11 @@
         "owner": "User and target-guild staff",
         "status": "PRESERVED",
         "hard_gate": true,
-        "evidence_ids": ["ev_local_verify", "ev_target_approver_regression"]
+        "evidence_ids": [
+          "ev_local_verify",
+          "ev_target_approver_regression",
+          "ev_command_lifetime_regression"
+        ]
       }
     ],
     "dependencies": [],
@@ -228,7 +237,18 @@
       "contradiction_claim_ids": [],
       "confidence": {
         "level": "HIGH",
-        "basis": "Focused authorization tests and the complete 80-test package suite exercise the gate mapping and exact allowlist path."
+        "basis": "Focused authorization tests and the complete 81-test package suite exercise the gate mapping and exact allowlist path."
+      }
+    },
+    {
+      "id": "claim_command_lifetime",
+      "label": "MEASURED",
+      "statement": "The shared command schema rejects an envelope whose issue-to-expiry interval exceeds 30 seconds, and command production and test fixtures use that same exported constant.",
+      "evidence_ids": ["ev_command_lifetime_regression", "ev_local_verify"],
+      "contradiction_claim_ids": [],
+      "confidence": {
+        "level": "HIGH",
+        "basis": "The focused boundary test rejects a 30,001-millisecond lifetime and the complete 81-test package suite passes with the shared constant used by production and fixture code."
       }
     },
     {
@@ -259,8 +279,8 @@
       "kind": "TEST_RESULT",
       "access": "GENERATED_CURRENT",
       "locator": "docs/TEST_EVIDENCE.md",
-      "captured_at": "2026-08-22T01:33:11-05:00",
-      "integrity": "Sanitized summary of frozen install, formatting, lint, typecheck, builds, 80 package tests, 13 Workers tests, wording, secret, dependency, skill, and deploy-bundle checks.",
+      "captured_at": "2026-08-22T01:44:00-05:00",
+      "integrity": "Sanitized summary of frozen install, formatting, lint, typecheck, builds, 81 package tests, 13 Workers tests, wording, secret, dependency, skill, and deploy-bundle checks.",
       "supports_claim_ids": ["claim_objective"],
       "contradicts_claim_ids": []
     },
@@ -272,6 +292,16 @@
       "captured_at": "2026-08-22T01:33:11-05:00",
       "integrity": "Current source and tests prove subcommand-specific authorization, an exact allowlisted target approver without Manage Channels or Manage Guild, no blanket default member permission, and a green full verification run.",
       "supports_claim_ids": ["claim_objective", "claim_target_approver_boundary"],
+      "contradicts_claim_ids": []
+    },
+    {
+      "id": "ev_command_lifetime_regression",
+      "kind": "TEST_RESULT",
+      "access": "GENERATED_CURRENT",
+      "locator": "packages/contracts/src/contracts.test.ts",
+      "captured_at": "2026-08-22T01:44:00-05:00",
+      "integrity": "Current source and tests enforce the 30-second maximum in the shared schema, reuse the exported constant in production and fixtures, and pass the complete local verification suite.",
+      "supports_claim_ids": ["claim_objective", "claim_command_lifetime"],
       "contradicts_claim_ids": []
     },
     {
@@ -330,6 +360,20 @@
       "status": "PASS",
       "evidence_ids": ["ev_target_approver_regression"],
       "changes_decision_if": "A failure would block command registration and require redesigning the target-authorization surface before live setup."
+    },
+    {
+      "id": "test_command_lifetime",
+      "question": "Does the shared command contract reject a validly shaped envelope whose lifetime exceeds the authorized 30-second window?",
+      "kind": "EXPERIMENT",
+      "discriminates_hypothesis_ids": [],
+      "predicted_outcomes": [],
+      "expected_decision_value": "MEDIUM",
+      "cost": "LOW",
+      "risk": "LOW",
+      "authorization_status": "AUTHORIZED",
+      "status": "PASS",
+      "evidence_ids": ["ev_command_lifetime_regression"],
+      "changes_decision_if": "A failure would block deployment because a producer other than the current Worker could issue an overlong signed command that the shared verifier accepts."
     }
   ],
   "trace": {
@@ -353,6 +397,15 @@
         "kind": "CONSEQUENCE",
         "statement": "Removing the blanket Discord command permission makes the runtime subcommand checks load-bearing for every voice administration invocation.",
         "claim_id": "claim_target_approver_boundary",
+        "depth": 1,
+        "terminal": true,
+        "closure_reason": "MONITORED"
+      },
+      {
+        "id": "node_command_lifetime_compatibility",
+        "kind": "CONSEQUENCE",
+        "statement": "Shared schema rejection makes the 30-second constant load-bearing for every command producer and fixture.",
+        "claim_id": "claim_command_lifetime",
         "depth": 1,
         "terminal": true,
         "closure_reason": "MONITORED"
@@ -386,6 +439,34 @@
           "level": "HIGH",
           "basis": "Current source and focused tests directly exercise the command definition, subcommand mapping, and exact service allowlist."
         }
+      },
+      {
+        "id": "edge_command_lifetime_compatibility",
+        "relation": "FORWARD",
+        "source_node_id": "root_node",
+        "target_node_id": "node_command_lifetime_compatibility",
+        "source_delta": "The shared envelope contract now rejects issue-to-expiry intervals longer than 30 seconds.",
+        "mechanism_status": "KNOWN",
+        "mechanism": "All parsers apply the same super-refinement, while the control Worker and shared fixture import the same lifetime constant.",
+        "conditions": [
+          "Consumers parse command envelopes through the shared contract.",
+          "The deployed control Worker matches the verified source."
+        ],
+        "lag": "At command creation and at each subsequent envelope parse.",
+        "target_delta": "A validly signed command cannot extend its authorized issue-to-expiry window beyond 30 seconds through schema-valid input.",
+        "affected_refs": ["inv_authority"],
+        "supporting_claim_ids": ["claim_command_lifetime"],
+        "contradicting_claim_ids": [],
+        "detection": {
+          "signal": "The 30,001-millisecond boundary test and complete package suite remain green.",
+          "latency": "Immediate in local tests and at the first parser invocation in a deployed runtime.",
+          "failure_to_detect": "A consumer that bypasses the shared parser would not inherit this bound."
+        },
+        "falsifier": "A validly signed envelope with a lifetime longer than 30 seconds parses successfully or is accepted by an agent command path.",
+        "confidence": {
+          "level": "HIGH",
+          "basis": "The shared parser, production command producer, fixture, and focused boundary test use the same exported constant."
+        }
       }
     ],
     "feedback_loops": [],
@@ -402,6 +483,7 @@
       "claim_objective",
       "claim_live_setup",
       "claim_target_approver_boundary",
+      "claim_command_lifetime",
       "claim_unknown"
     ],
     "remaining_unknown_claim_ids": ["claim_unknown"],
@@ -435,13 +517,43 @@
         "evidence_ids": ["ev_target_approver_regression"]
       },
       "mitigation_consequence_node_ids": ["node_target_approver_visibility"]
+    },
+    {
+      "id": "action_command_lifetime",
+      "description": "Enforce the 30-second command lifetime in the shared contract and reuse its exported constant in production and test fixtures.",
+      "status": "VERIFIED",
+      "authorization_status": "AUTHORIZED",
+      "authority_basis": "The user-approved plan fixes a 30-second expiry for signed command envelopes and requests reusable shared contracts and security controls.",
+      "destructive": false,
+      "production": false,
+      "external_state_change": false,
+      "irreversible": false,
+      "monitoring": "The focused boundary test and complete verification suite must remain green; deployed command receipts still require live proof.",
+      "rollback": {
+        "kind": "TRUE_ROLLBACK",
+        "procedure": "Revert the shared constant, schema refinement, producer import, fixture import, focused test, and matching documentation before deployment.",
+        "preconditions": ["No deployed component depends on the corrected schema contract."],
+        "verification": "Run the complete verification suite and inspect the prior envelope schema and producer lifetime.",
+        "evidence_ids": ["ev_command_lifetime_regression"],
+        "irreversible_residue": "None; the correction has not been deployed."
+      },
+      "recovery": {
+        "procedure": "Restore the shared lifetime constant and parser boundary, then rerun the focused and full suites if a later producer or parser diverges.",
+        "owner": "Repository maintainer",
+        "evidence_ids": ["ev_command_lifetime_regression"]
+      },
+      "mitigation_consequence_node_ids": ["node_command_lifetime_compatibility"]
     }
   ],
   "verification": {
     "mechanism": {
       "status": "PASS",
       "signal": "Signed envelopes, replay, migration-backed Durable Object state, relay limits, managed rooms, voice state transitions, and agent WebSocket behavior pass local tests.",
-      "evidence_ids": ["ev_local_verify", "ev_target_approver_regression"],
+      "evidence_ids": [
+        "ev_local_verify",
+        "ev_target_approver_regression",
+        "ev_command_lifetime_regression"
+      ],
       "rationale": "The local mechanism is exercised without treating mocks or local sockets as live Discord voice evidence."
     },
     "endpoint": {
@@ -453,7 +565,12 @@
     "guardrails": {
       "status": "PASS",
       "signal": "Authorization, least privilege, secret scanning, copy triage, relay suppression, redaction, and protected-root boundaries pass their recorded checks.",
-      "evidence_ids": ["ev_user_plan", "ev_local_verify", "ev_target_approver_regression"],
+      "evidence_ids": [
+        "ev_user_plan",
+        "ev_local_verify",
+        "ev_target_approver_regression",
+        "ev_command_lifetime_regression"
+      ],
       "rationale": "These checks support the local guardrail claim; live guild permissions remain separately unverified."
     },
     "recovery": {

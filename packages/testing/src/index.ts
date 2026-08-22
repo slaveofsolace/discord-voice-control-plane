@@ -1,4 +1,4 @@
-import type { UnsignedCommandEnvelope } from "@discord-vc-control/contracts";
+import { commandLifetimeMs, type UnsignedCommandEnvelope } from "@discord-vc-control/contracts";
 
 export function commandFixture(
   overrides: Partial<UnsignedCommandEnvelope> = {}
@@ -8,7 +8,7 @@ export function commandFixture(
     version: 1,
     command_id: "123e4567-e89b-42d3-a456-426614174000",
     issued_at: issuedAt,
-    expires_at: issuedAt + 30_000,
+    expires_at: issuedAt + commandLifetimeMs,
     nonce: "fixture-nonce-00000001",
     actor_user_id: "100000000000000001",
     control_guild_id: "100000000000000002",

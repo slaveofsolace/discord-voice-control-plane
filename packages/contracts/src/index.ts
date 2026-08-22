@@ -28,6 +28,8 @@ export const controlActionSchema = z.enum([
 ]);
 export type ControlAction = z.infer<typeof controlActionSchema>;
 
+export const commandLifetimeMs = 30_000;
+
 export const commandPayloadSchemas = {
   status: z.object({}),
   join: z.object({}),
@@ -69,6 +71,13 @@ export const unsignedCommandEnvelopeSchema = z
       context.addIssue({
         code: "custom",
         message: "expires_at must be after issued_at",
+        path: ["expires_at"]
+      });
+    }
+    if (value.expires_at - value.issued_at > commandLifetimeMs) {
+      context.addIssue({
+        code: "custom",
+        message: `command lifetime must not exceed ${commandLifetimeMs} milliseconds`,
         path: ["expires_at"]
       });
     }

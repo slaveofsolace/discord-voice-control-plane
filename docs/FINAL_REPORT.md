@@ -46,7 +46,7 @@ Cloudflare Container hosting is accepted only if the dedicated probe passes ever
 
 ## 6. Verification Evidence
 
-- `UNIT TESTED`: clean `pnpm verify` passed formatting, typed lint, strict typecheck, all eight workspace builds, and 80 package tests across 15 files.
+- `UNIT TESTED`: clean `pnpm verify` passed formatting, typed lint, strict typecheck, all eight workspace builds, and 81 package tests across 15 files.
 - `INTEGRATION TESTED`: 13 migration-backed Workers, Durable Object, D1, alarm, outbox, restart, authorization, and configuration tests passed.
 - `UNIT TESTED`: copy triage passed across 22 files; secret scanning passed across 115 candidate files; the high-severity dependency audit reported no known vulnerabilities.
 - `UNIT TESTED`: all three Worker bundles passed Wrangler dry-runs. The two Container-backed Workers were bundled locally with Container rollout disabled because Docker is unavailable on this machine.

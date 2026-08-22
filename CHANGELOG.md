@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Enforced the 30-second command lifetime in the shared envelope schema and reused the same constant in command production and test fixtures.
+
 - Corrected `/voice-admin authorize-target` so an exact configured target approver is not accidentally blocked by the unrelated managed-room permission gate; all administration subcommands remain runtime-authorized.
 
 - Added the interaction-only VC Control application and its signed Cloudflare Worker endpoint.

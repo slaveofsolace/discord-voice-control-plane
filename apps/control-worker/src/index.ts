@@ -1,4 +1,5 @@
 import {
+  commandLifetimeMs,
   controlActionSchema,
   parseActionPayload,
   type CommandAck,
@@ -112,7 +113,7 @@ async function dispatchCommand(
     version: 1,
     command_id: crypto.randomUUID(),
     issued_at: now,
-    expires_at: now + 30_000,
+    expires_at: now + commandLifetimeMs,
     nonce: crypto.randomUUID(),
     actor_user_id: actorUserId,
     control_guild_id: controlGuildId,
