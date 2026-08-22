@@ -1,0 +1,46 @@
+name: CI
+
+on:
+  push:
+    branches: [main, "sol/**"]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Install pinned pnpm and Node
+        uses: pnpm/setup@c8e77b72cd6022852162c92aa10e7e72b7209c9b # v2
+        with:
+          version: 11.19.0
+          runtime: node@24.19.0
+          cache: true
+          install: false
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Verify source and tests
+        run: pnpm verify
+
+      - name: Scan candidate files for secrets
+        run: pnpm security:secrets
+
+      - name: Audit dependencies
+        run: pnpm security:dependencies
+
+      - name: Build voice-agent image
+        run: docker build --file Dockerfile.voice-agent --tag discord-vc/voice-agent:ci .
+
+      - name: Build Cloudflare probe image
+        run: docker build --file Dockerfile.cloudflare-voice-probe --tag discord-vc/voice-probe:ci .
+
+      - name: Build control Worker bundle without deployment
+        run: pnpm exec wrangler deploy --dry-run --outdir .runtime/dryrun-control --config apps/control-worker/wrangler.jsonc
