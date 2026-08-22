@@ -22,6 +22,14 @@ const csvSnowflakes = z
     return new Set(parsed.data);
   });
 
+const optionalSnowflake = z.union([snowflakeSchema, z.literal("")]).default("");
+
+const millisecondString = z
+  .string()
+  .regex(/^\d+$/u)
+  .transform(Number)
+  .pipe(z.number().int().min(10_000).max(300_000));
+
 export const controlEnvironmentSchema = z
   .object({
     DEPLOYMENT_ID: z.string().min(1).max(64),
@@ -49,6 +57,26 @@ export const controlEnvironmentSchema = z
         code: "custom",
         message: "Previous agent key ID and secret must be configured together",
         path: ["AGENT_PREVIOUS_KEY_ID"]
+      });
+    }
+    if (
+      value.AGENT_PREVIOUS_KEY_ID !== undefined &&
+      value.AGENT_PREVIOUS_KEY_ID === value.AGENT_KEY_ID
+    ) {
+      context.addIssue({
+        code: "custom",
+        message: "Current and previous agent key IDs must differ",
+        path: ["AGENT_PREVIOUS_KEY_ID"]
+      });
+    }
+    if (
+      value.AGENT_PREVIOUS_AUTH_SECRET !== undefined &&
+      value.AGENT_PREVIOUS_AUTH_SECRET === value.AGENT_AUTH_SECRET
+    ) {
+      context.addIssue({
+        code: "custom",
+        message: "Current and previous agent secrets must differ",
+        path: ["AGENT_PREVIOUS_AUTH_SECRET"]
       });
     }
   });
@@ -87,7 +115,56 @@ export const voiceEnvironmentSchema = z
         path: ["AGENT_PREVIOUS_KEY_ID"]
       });
     }
+    if (
+      value.AGENT_PREVIOUS_KEY_ID !== undefined &&
+      value.AGENT_PREVIOUS_KEY_ID === value.AGENT_KEY_ID
+    ) {
+      context.addIssue({
+        code: "custom",
+        message: "Current and previous agent key IDs must differ",
+        path: ["AGENT_PREVIOUS_KEY_ID"]
+      });
+    }
+    if (
+      value.AGENT_PREVIOUS_AUTH_SECRET !== undefined &&
+      value.AGENT_PREVIOUS_AUTH_SECRET === value.AGENT_AUTH_SECRET
+    ) {
+      context.addIssue({
+        code: "custom",
+        message: "Current and previous agent secrets must differ",
+        path: ["AGENT_PREVIOUS_AUTH_SECRET"]
+      });
+    }
+  });
+
+export const voiceHostModeSchema = z
+  .object({
+    HOST_ENABLED: booleanString,
+    PROBE_ENABLED: booleanString,
+    PROBE_GUILD_ID: optionalSnowflake,
+    PROBE_VOICE_CHANNEL_ID: optionalSnowflake,
+    PROBE_STABLE_MS: millisecondString.default(60_000)
+  })
+  .superRefine((value, context) => {
+    if (value.HOST_ENABLED && value.PROBE_ENABLED) {
+      context.addIssue({
+        code: "custom",
+        message: "Production host and voice probe cannot run concurrently",
+        path: ["PROBE_ENABLED"]
+      });
+    }
+    if (
+      value.PROBE_ENABLED &&
+      (value.PROBE_GUILD_ID === "" || value.PROBE_VOICE_CHANNEL_ID === "")
+    ) {
+      context.addIssue({
+        code: "custom",
+        message: "Enabled probe requires exact guild and voice channel IDs",
+        path: ["PROBE_GUILD_ID"]
+      });
+    }
   });
 
 export type ControlEnvironment = z.infer<typeof controlEnvironmentSchema>;
 export type VoiceEnvironment = z.infer<typeof voiceEnvironmentSchema>;
+export type VoiceHostMode = z.infer<typeof voiceHostModeSchema>;

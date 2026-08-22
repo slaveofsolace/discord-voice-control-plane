@@ -145,6 +145,23 @@ describe("agent WebSocket client", () => {
     await new Promise((resolve) => setTimeout(resolve, 25));
     expect(onCommand).not.toHaveBeenCalled();
     releaseBootstrap();
+    await vi.waitFor(() =>
+      expect(outboundMessages).toContainEqual({
+        type: "command_start",
+        command_id: signed.command_id,
+        deployment_id: "test",
+        occurred_at: expect.any(Number)
+      })
+    );
+    socket.send(
+      JSON.stringify({
+        type: "command_start_ack",
+        command_id: signed.command_id,
+        deployment_id: "test",
+        accepted: true,
+        duplicate: false
+      })
+    );
     await vi.waitFor(() => expect(onCommand).toHaveBeenCalledWith(signed, false));
     socket.send(JSON.stringify(signed));
     await vi.waitFor(() => expect(onCommand).toHaveBeenLastCalledWith(signed, true));

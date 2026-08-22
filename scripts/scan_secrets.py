@@ -35,6 +35,16 @@ def candidate_files() -> list[pathlib.Path]:
 
 def main() -> int:
     findings: list[str] = []
+    ignored = subprocess.run(
+        ["git", "check-ignore", "--quiet", "--no-index", "deploy/voice-agent.env"],
+        cwd=ROOT,
+        check=False,
+    )
+    if ignored.returncode != 0:
+        findings.append("deploy/voice-agent.env: not excluded by Git ignore rules")
+    dockerignore = (ROOT / ".dockerignore").read_text(encoding="utf-8").splitlines()
+    if "deploy/voice-agent.env" not in dockerignore:
+        findings.append("deploy/voice-agent.env: not explicitly excluded from Docker build context")
     for path in candidate_files():
         if not path.is_file() or path.suffix.lower() in SKIP_SUFFIXES:
             continue

@@ -14,6 +14,12 @@
       "image": "../../Dockerfile.voice-agent",
       "instance_type": "lite",
       "max_instances": 1
+    },
+    {
+      "class_name": "VoiceProbeContainer",
+      "image": "../../Dockerfile.cloudflare-voice-probe",
+      "instance_type": "lite",
+      "max_instances": 1
     }
   ],
   "durable_objects": {
@@ -21,6 +27,10 @@
       {
         "name": "VOICE_AGENT_CONTAINER",
         "class_name": "VoiceAgentContainer"
+      },
+      {
+        "name": "VOICE_PROBE_CONTAINER",
+        "class_name": "VoiceProbeContainer"
       }
     ]
   },
@@ -28,6 +38,10 @@
     {
       "tag": "v1",
       "new_sqlite_classes": ["VoiceAgentContainer"]
+    },
+    {
+      "tag": "v2",
+      "new_sqlite_classes": ["VoiceProbeContainer"]
     }
   ],
   "triggers": {
@@ -42,6 +56,10 @@
     "MANAGED_ROOMS_ENABLED": "false",
     "MANAGED_GUILD_IDS": "",
     "TARGET_APPROVER_USER_IDS": "",
-    "AGENT_KEY_ID": "local-v1"
+    "AGENT_KEY_ID": "local-v1",
+    "PROBE_ENABLED": "false",
+    "PROBE_GUILD_ID": "",
+    "PROBE_VOICE_CHANNEL_ID": "",
+    "PROBE_STABLE_MS": "60000"
   }
 }

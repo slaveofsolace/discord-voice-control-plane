@@ -120,8 +120,8 @@ async function handleControlCommand(command: CommandEnvelope, duplicate: boolean
     const receipt = commandReceipts.get(command.command_id);
     if (receipt !== undefined) {
       agentClient.send({ ...receipt, duplicate: true, occurred_at: Date.now() });
-      return;
     }
+    return;
   }
   const receipt = await controller.execute(command);
   commandReceipts.set(command.command_id, receipt);
@@ -221,7 +221,7 @@ client.on(Events.InteractionCreate, (interaction) => {
         if (subcommand === "enable" && !environment.MANAGED_ROOMS_ENABLED) {
           throw new Error("MANAGED_ROOMS_DISABLED_BY_DEPLOYMENT");
         }
-        const config = managedRooms.setEnabled(member.guild, member, subcommand === "enable");
+        const config = await managedRooms.setEnabled(member.guild, member, subcommand === "enable");
         content = `Managed rooms ${config.managed_rooms_enabled ? "enabled" : "disabled"}.`;
       } else if (subcommand === "authorize-target") {
         const channel = interaction.options.getChannel("channel", true);
@@ -303,7 +303,13 @@ const healthServer = createServer((request, response) => {
     return;
   }
   response.writeHead(200, { "content-type": "application/json; charset=utf-8" });
-  response.end(JSON.stringify({ ok: true, service: "voice-agent", status: controller.status }));
+  response.end(
+    JSON.stringify({
+      ok: true,
+      service: "voice-agent",
+      observed_state: controller.status.observed_state
+    })
+  );
 });
 healthServer.listen(port, "0.0.0.0", () => log("info", "health_listener_ready", { port }));
 

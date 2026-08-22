@@ -1,8 +1,8 @@
 import { spawn } from "node:child_process";
 
 const service = process.argv[2];
-if (!new Set(["control", "voice-host", "probe"]).has(service ?? "")) {
-  throw new Error("USAGE_DEPLOY_CONTROL_VOICE_HOST_OR_PROBE");
+if (!new Set(["control", "voice-host"]).has(service ?? "")) {
+  throw new Error("USAGE_DEPLOY_CONTROL_OR_VOICE_HOST");
 }
 if (process.env.DEPLOY_APPROVED !== "discord-voice-control-plane") {
   throw new Error("SET_DEPLOY_APPROVED_TO_DISCORD_VOICE_CONTROL_PLANE");
@@ -25,6 +25,12 @@ function run(arguments_: string[]): Promise<void> {
 function variable(name: string, fallback?: string): string {
   const value = process.env[name] ?? fallback;
   if (value === undefined) throw new Error(`MISSING_${name}`);
+  return `${name}:${value}`;
+}
+
+function booleanVariable(name: string, fallback = "false"): string {
+  const value = process.env[name] ?? fallback;
+  if (value !== "true" && value !== "false") throw new Error(`INVALID_${name}`);
   return `${name}:${value}`;
 }
 
@@ -59,27 +65,26 @@ if (service === "control") {
     await migrate();
     await deploy();
   }
-} else if (service === "voice-host") {
+} else {
+  const hostEnabled = process.env.HOST_ENABLED === "true";
+  const probeEnabled = process.env.PROBE_ENABLED === "true";
+  if (hostEnabled && probeEnabled) throw new Error("HOST_AND_PROBE_CANNOT_RUN_CONCURRENTLY");
   const vars = [
     variable("DEPLOYMENT_ID"),
     variable("TENANT_ID"),
-    variable("HOST_ENABLED", "true"),
-    variable("PREFIX_COMMANDS_ENABLED", "false"),
-    variable("MESSAGE_CONTENT_INTENT_ENABLED", "false"),
-    variable("MANAGED_ROOMS_ENABLED", "false"),
+    booleanVariable("HOST_ENABLED"),
+    booleanVariable("PREFIX_COMMANDS_ENABLED"),
+    booleanVariable("MESSAGE_CONTENT_INTENT_ENABLED"),
+    booleanVariable("MANAGED_ROOMS_ENABLED"),
     variable("MANAGED_GUILD_IDS", ""),
     variable("TARGET_APPROVER_USER_IDS", ""),
     variable("AGENT_KEY_ID"),
-    variable("CONTROL_AGENT_WS_URL")
+    variable("CONTROL_AGENT_WS_URL"),
+    booleanVariable("PROBE_ENABLED"),
+    variable("PROBE_GUILD_ID", probeEnabled ? undefined : ""),
+    variable("PROBE_VOICE_CHANNEL_ID", probeEnabled ? undefined : ""),
+    variable("PROBE_STABLE_MS", "60000")
   ].flatMap((value) => ["--var", value]);
   vars.push(...optionalVariable("AGENT_PREVIOUS_KEY_ID"));
   await run(["deploy", "--config", "apps/voice-host-worker/wrangler.jsonc", ...vars]);
-} else {
-  const vars = [
-    variable("PROBE_ENABLED", "true"),
-    variable("PROBE_GUILD_ID"),
-    variable("PROBE_VOICE_CHANNEL_ID"),
-    variable("PROBE_STABLE_MS", "60000")
-  ].flatMap((value) => ["--var", value]);
-  await run(["deploy", "--config", "spikes/cloudflare-voice-probe/wrangler.jsonc", ...vars]);
 }

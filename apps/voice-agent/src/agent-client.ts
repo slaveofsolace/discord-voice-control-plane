@@ -2,6 +2,7 @@ import WebSocket, { type RawData } from "ws";
 
 import {
   agentBootstrapSchema,
+  commandStartAckSchema,
   commandEnvelopeSchema,
   retryDelayMs,
   type AgentBootstrap,
@@ -31,6 +32,7 @@ export interface AgentClientOptions {
 export class AgentClient {
   readonly #acceptedCommands = new Map<string, { expiresAt: number; nonce: string }>();
   readonly #outbox: AgentMessage[] = [];
+  readonly #pendingStarts = new Map<string, { command: CommandEnvelope; timer: NodeJS.Timeout }>();
   readonly #replayGuard = new ReplayGuard();
   #closed = false;
   #blocked = false;
@@ -56,6 +58,7 @@ export class AgentClient {
     this.#closed = true;
     if (this.#timer !== null) clearTimeout(this.#timer);
     this.#timer = null;
+    this.clearPendingStarts();
     this.#socket?.close(1000, "agent shutdown");
     this.#socket = null;
   }
@@ -108,7 +111,10 @@ export class AgentClient {
         this.block("AGENT_AUTH_REJECTED");
       }
     });
-    socket.once("close", () => this.scheduleReconnect());
+    socket.once("close", () => {
+      this.clearPendingStarts();
+      this.scheduleReconnect();
+    });
     socket.once("error", () => {
       socket.close();
     });
@@ -121,6 +127,11 @@ export class AgentClient {
         ? data.toString("utf8")
         : Buffer.from(data).toString("utf8");
       const input: unknown = JSON.parse(text);
+      const startAck = commandStartAckSchema.safeParse(input);
+      if (startAck.success) {
+        await this.handleCommandStartAck(startAck.data);
+        return;
+      }
       const bootstrap = agentBootstrapSchema.safeParse(input);
       if (bootstrap.success) {
         if (bootstrap.data.deployment_id !== this.options.deploymentId) {
@@ -148,16 +159,29 @@ export class AgentClient {
         await this.options.onCommand(verified, true);
         return;
       }
-      if (!this.#replayGuard.accept(verified.nonce)) throw new Error("COMMAND_REPLAY");
-      const now = Date.now();
-      for (const [commandId, receipt] of this.#acceptedCommands) {
-        if (receipt.expiresAt <= now) this.#acceptedCommands.delete(commandId);
+      const pending = this.#pendingStarts.get(verified.command_id);
+      if (pending !== undefined) {
+        if (pending.command.nonce !== verified.nonce) throw new Error("COMMAND_ID_COLLISION");
+        return;
       }
-      this.#acceptedCommands.set(verified.command_id, {
-        expiresAt: now + 24 * 60 * 60_000,
-        nonce: verified.nonce
+      if (
+        [...this.#pendingStarts.values()].some(
+          (candidate) => candidate.command.nonce === verified.nonce
+        )
+      ) {
+        throw new Error("COMMAND_REPLAY");
+      }
+      const timer = setTimeout(() => {
+        this.#pendingStarts.delete(verified.command_id);
+        this.#socket?.close(1011, "command start acknowledgement timeout");
+      }, 5_000);
+      this.#pendingStarts.set(verified.command_id, { command: verified, timer });
+      this.send({
+        type: "command_start",
+        command_id: verified.command_id,
+        deployment_id: this.options.deploymentId,
+        occurred_at: Date.now()
       });
-      await this.options.onCommand(verified, false);
     } catch (error) {
       const message = error instanceof Error ? error.message : "INVALID_CONTROL_MESSAGE";
       const code = /^[A-Z\d_]{1,64}$/u.test(message) ? message : "INVALID_CONTROL_MESSAGE";
@@ -185,6 +209,7 @@ export class AgentClient {
     this.#blocked = true;
     if (this.#timer !== null) clearTimeout(this.#timer);
     this.#timer = null;
+    this.clearPendingStarts();
     this.#socket?.terminate();
     this.#socket = null;
     void this.options.onBlocked(code);
@@ -195,6 +220,7 @@ export class AgentClient {
     this.#blocked = true;
     if (this.#timer !== null) clearTimeout(this.#timer);
     this.#timer = null;
+    this.clearPendingStarts();
     const socket = this.#socket;
     this.#socket = null;
     socket?.close(1008, "invalid control message");
@@ -216,6 +242,41 @@ export class AgentClient {
       );
       this.#outbox.splice(replaceable >= 0 ? replaceable : 0, 1);
     }
+  }
+
+  private async handleCommandStartAck(
+    acknowledgement: ReturnType<typeof commandStartAckSchema.parse>
+  ): Promise<void> {
+    if (acknowledgement.deployment_id !== this.options.deploymentId) {
+      throw new Error("WRONG_COMMAND_START_DEPLOYMENT");
+    }
+    const pending = this.#pendingStarts.get(acknowledgement.command_id);
+    if (pending === undefined) {
+      if (acknowledgement.duplicate) return;
+      throw new Error("UNEXPECTED_COMMAND_START_ACK");
+    }
+    clearTimeout(pending.timer);
+    this.#pendingStarts.delete(acknowledgement.command_id);
+    if (!acknowledgement.accepted) {
+      if (acknowledgement.duplicate) return;
+      throw new Error("COMMAND_START_REJECTED");
+    }
+    if (acknowledgement.duplicate) throw new Error("INVALID_COMMAND_START_ACK");
+    if (!this.#replayGuard.accept(pending.command.nonce)) throw new Error("COMMAND_REPLAY");
+    const now = Date.now();
+    for (const [commandId, receipt] of this.#acceptedCommands) {
+      if (receipt.expiresAt <= now) this.#acceptedCommands.delete(commandId);
+    }
+    this.#acceptedCommands.set(pending.command.command_id, {
+      expiresAt: now + 24 * 60 * 60_000,
+      nonce: pending.command.nonce
+    });
+    await this.options.onCommand(pending.command, false);
+  }
+
+  private clearPendingStarts(): void {
+    for (const pending of this.#pendingStarts.values()) clearTimeout(pending.timer);
+    this.#pendingStarts.clear();
   }
 
   private replacementKey(message: AgentMessage): string | null {

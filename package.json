@@ -25,10 +25,8 @@
     "commands:voice": "tsx scripts/register-voice-commands.ts",
     "secrets:control": "tsx scripts/configure-cloudflare-secrets.ts control",
     "secrets:voice-host": "tsx scripts/configure-cloudflare-secrets.ts voice-host",
-    "secrets:probe": "tsx scripts/configure-cloudflare-secrets.ts probe",
     "deploy:control": "tsx scripts/deploy.ts control",
     "deploy:voice-host": "tsx scripts/deploy.ts voice-host",
-    "deploy:probe": "tsx scripts/deploy.ts probe",
     "rollback": "tsx scripts/rollback.ts"
   },
   "devDependencies": {

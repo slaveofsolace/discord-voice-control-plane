@@ -11,6 +11,7 @@
     "deploy": "wrangler deploy --config wrangler.jsonc"
   },
   "dependencies": {
+    "@discord-vc-control/config": "workspace:*",
     "@discord-vc-control/contracts": "workspace:*",
     "@discord-vc-control/security": "workspace:*",
     "discord-interactions": "4.4.0",

@@ -7,7 +7,8 @@ import {
   type AgentStatus,
   type AgentBootstrap,
   type AgentMessage,
-  type CommandAck
+  type CommandAck,
+  type CommandStart
 } from "@discord-vc-control/contracts";
 import {
   agentHandshakePayload,
@@ -37,8 +38,8 @@ interface AuditOutboxRow extends Record<string, SqlStorageValue> {
 }
 
 interface StateOutboxRow extends Record<string, SqlStorageValue> {
-  id: number;
   event_json: string;
+  state_key: string;
 }
 
 type PersistentAgentEvent = Extract<
@@ -49,6 +50,9 @@ type PersistentAgentEvent = Extract<
 interface ExpirationRow extends Record<string, SqlStorageValue> {
   expires_at: number | null;
 }
+
+const agentHeartbeatStaleMs = 45_000;
+const agentSessionLifetimeMs = 5 * 60_000;
 
 export class AgentSession extends DurableObject<Env> {
   constructor(context: DurableObjectState, env: Env) {
@@ -70,9 +74,19 @@ export class AgentSession extends DurableObject<Env> {
         envelope_json TEXT NOT NULL,
         expires_at INTEGER NOT NULL
       );
+      CREATE TABLE IF NOT EXISTS executing_commands (
+        command_id TEXT PRIMARY KEY,
+        envelope_json TEXT NOT NULL,
+        expires_at INTEGER NOT NULL
+      );
       CREATE TABLE IF NOT EXISTS receipts (
         command_id TEXT PRIMARY KEY,
         ack_json TEXT NOT NULL,
+        expires_at INTEGER NOT NULL
+      );
+      CREATE TABLE IF NOT EXISTS interaction_ids (
+        interaction_id TEXT PRIMARY KEY,
+        command_id TEXT NOT NULL,
         expires_at INTEGER NOT NULL
       );
       CREATE TABLE IF NOT EXISTS audit_outbox (
@@ -85,7 +99,19 @@ export class AgentSession extends DurableObject<Env> {
         event_json TEXT NOT NULL,
         created_at INTEGER NOT NULL
       );
+      CREATE TABLE IF NOT EXISTS state_outbox_v2 (
+        state_key TEXT PRIMARY KEY,
+        event_json TEXT NOT NULL,
+        created_at INTEGER NOT NULL
+      );
+      CREATE TABLE IF NOT EXISTS state_dead_letters (
+        state_key TEXT PRIMARY KEY,
+        event_json TEXT NOT NULL,
+        error_code TEXT NOT NULL,
+        created_at INTEGER NOT NULL
+      );
     `);
+    this.migrateLegacyStateOutbox();
   }
 
   async fetch(request: Request): Promise<Response> {
@@ -95,6 +121,9 @@ export class AgentSession extends DurableObject<Env> {
     }
     if (url.pathname === "/commands" && request.method === "POST") {
       return this.acceptCommand(request);
+    }
+    if (url.pathname === "/interactions" && request.method === "POST") {
+      return this.claimInteraction(request);
     }
     if (url.pathname.startsWith("/receipts/") && request.method === "GET") {
       return this.getReceipt(url.pathname.slice("/receipts/".length));
@@ -110,6 +139,7 @@ export class AgentSession extends DurableObject<Env> {
 
   async alarm(): Promise<void> {
     this.purgeExpiredSessionRows();
+    this.enforceAgentSessions();
     let retryAt: number | null = null;
     try {
       await this.flushAuditOutbox();
@@ -122,21 +152,28 @@ export class AgentSession extends DurableObject<Env> {
         `SELECT MIN(expires_at) AS expires_at FROM (
            SELECT expires_at FROM nonces
            UNION ALL SELECT expires_at FROM pending_commands
+           UNION ALL SELECT expires_at FROM executing_commands
            UNION ALL SELECT expires_at FROM receipts
+           UNION ALL SELECT expires_at FROM interaction_ids
          )`
       )
       .one();
-    const nextAt =
+    let nextAt =
       retryAt === null
         ? next.expires_at
         : next.expires_at === null
           ? retryAt
           : Math.min(retryAt, next.expires_at);
+    const sessionDeadline = this.nextAgentSessionDeadline();
+    if (sessionDeadline !== null) {
+      nextAt = nextAt === null ? sessionDeadline : Math.min(nextAt, sessionDeadline);
+    }
     if (nextAt !== null) await this.ctx.storage.setAlarm(nextAt);
   }
 
   async webSocketMessage(webSocket: WebSocket, message: ArrayBuffer | string): Promise<void> {
     try {
+      if (!this.agentSocketAuthorized(webSocket)) throw new Error("AGENT_SESSION_EXPIRED");
       if (typeof message !== "string") throw new Error("BINARY_AGENT_MESSAGE_REJECTED");
       const parsed = agentMessageSchema.parse(JSON.parse(message));
       if (parsed.type === "heartbeat") {
@@ -145,6 +182,7 @@ export class AgentSession extends DurableObject<Env> {
           "UPDATE session_state SET last_heartbeat = ?, last_error = NULL WHERE id = 1",
           Date.now()
         );
+        await this.scheduleCleanup(Date.now() + agentHeartbeatStaleMs);
         return;
       }
       if (parsed.type === "status") {
@@ -155,10 +193,15 @@ export class AgentSession extends DurableObject<Env> {
           JSON.stringify(parsed),
           receivedAt
         );
+        await this.scheduleCleanup(receivedAt + agentHeartbeatStaleMs);
         return;
       }
       if (parsed.type === "ack") {
         await this.storeAck(parsed);
+        return;
+      }
+      if (parsed.type === "command_start") {
+        await this.storeCommandStart(webSocket, parsed);
         return;
       }
       if (parsed.type === "managed_room_event") {
@@ -227,11 +270,23 @@ export class AgentSession extends DurableObject<Env> {
     }
     await this.scheduleCleanup(Date.now() + 300_000);
     for (const socket of this.ctx.getWebSockets("agent")) socket.close(1012, "superseded");
+    const acceptedAt = Date.now();
+    const sessionExpiresAt = acceptedAt + agentSessionLifetimeMs;
     const pair = new WebSocketPair();
     const client = pair[0];
     const server = pair[1];
-    this.ctx.acceptWebSocket(server, ["agent"]);
-    await this.sendBootstrap(server);
+    this.ctx.acceptWebSocket(server, ["agent", `kid:${kid}`, `expires:${sessionExpiresAt}`]);
+    this.ctx.storage.sql.exec(
+      "UPDATE session_state SET last_heartbeat = ?, last_error = NULL WHERE id = 1",
+      acceptedAt
+    );
+    await this.scheduleCleanup(Math.min(sessionExpiresAt, acceptedAt + agentHeartbeatStaleMs));
+    try {
+      await this.sendBootstrap(server);
+    } catch (error) {
+      server.close(1011, "bootstrap unavailable");
+      throw error;
+    }
     this.flushPending(server);
     return new Response(null, { status: 101, webSocket: client });
   }
@@ -260,6 +315,15 @@ export class AgentSession extends DurableObject<Env> {
       )
       .toArray()[0];
     if (existingPending !== undefined) return Response.json({ queued: true, duplicate: true });
+    const existingExecution = this.ctx.storage.sql
+      .exec<{ command_id: string }>(
+        "SELECT command_id FROM executing_commands WHERE command_id = ?",
+        verified.command_id
+      )
+      .toArray()[0];
+    if (existingExecution !== undefined) {
+      return Response.json({ queued: false, duplicate: true, executing: true });
+    }
     if (!this.consumeNonce(verified.nonce)) {
       return Response.json({ error: "COMMAND_REPLAY" }, { status: 409 });
     }
@@ -274,6 +338,44 @@ export class AgentSession extends DurableObject<Env> {
     const socket = this.ctx.getWebSockets("agent")[0];
     if (socket !== undefined) socket.send(JSON.stringify(verified));
     return Response.json({ queued: true, duplicate: false, agentConnected: socket !== undefined });
+  }
+
+  private async claimInteraction(request: Request): Promise<Response> {
+    const input: unknown = await request.json();
+    if (
+      typeof input !== "object" ||
+      input === null ||
+      !("interaction_id" in input) ||
+      typeof input.interaction_id !== "string" ||
+      !/^\d{17,20}$/u.test(input.interaction_id) ||
+      !("command_id" in input) ||
+      typeof input.command_id !== "string" ||
+      !/^[a-f\d]{8}-[a-f\d]{4}-5[a-f\d]{3}-[89ab][a-f\d]{3}-[a-f\d]{12}$/iu.test(input.command_id)
+    ) {
+      return new Response("Invalid interaction claim", { status: 400 });
+    }
+    this.purgeExpiredSessionRows();
+    const existing = this.ctx.storage.sql
+      .exec<{ command_id: string }>(
+        "SELECT command_id FROM interaction_ids WHERE interaction_id = ?",
+        input.interaction_id
+      )
+      .toArray()[0];
+    if (existing !== undefined) {
+      if (existing.command_id !== input.command_id) {
+        return Response.json({ error: "INTERACTION_ID_COLLISION" }, { status: 409 });
+      }
+      return Response.json({ duplicate: true, command_id: existing.command_id });
+    }
+    const expiresAt = Date.now() + 24 * 60 * 60_000;
+    this.ctx.storage.sql.exec(
+      "INSERT INTO interaction_ids (interaction_id, command_id, expires_at) VALUES (?, ?, ?)",
+      input.interaction_id,
+      input.command_id,
+      expiresAt
+    );
+    await this.scheduleCleanup(expiresAt);
+    return Response.json({ duplicate: false, command_id: input.command_id });
   }
 
   private getReceipt(commandId: string): Response {
@@ -296,14 +398,14 @@ export class AgentSession extends DurableObject<Env> {
 
   private async storeAck(ack: CommandAck): Promise<void> {
     this.purgeExpiredSessionRows();
-    const pending = this.ctx.storage.sql
+    const executing = this.ctx.storage.sql
       .exec<PendingRow>(
-        "SELECT envelope_json FROM pending_commands WHERE command_id = ?",
+        "SELECT envelope_json FROM executing_commands WHERE command_id = ?",
         ack.command_id
       )
       .toArray()[0];
-    if (pending === undefined) return;
-    const envelope = commandEnvelopeSchema.parse(JSON.parse(pending.envelope_json));
+    if (executing === undefined) return;
+    const envelope = commandEnvelopeSchema.parse(JSON.parse(executing.envelope_json));
     const expiresAt = Date.now() + 24 * 60 * 60_000;
     this.ctx.storage.sql.exec(
       `INSERT INTO receipts (command_id, ack_json, expires_at) VALUES (?, ?, ?)
@@ -313,7 +415,10 @@ export class AgentSession extends DurableObject<Env> {
       expiresAt
     );
     await this.scheduleCleanup(expiresAt);
-    this.ctx.storage.sql.exec("DELETE FROM pending_commands WHERE command_id = ?", ack.command_id);
+    this.ctx.storage.sql.exec(
+      "DELETE FROM executing_commands WHERE command_id = ?",
+      ack.command_id
+    );
     await this.ensureDeployment();
     await this.env.DB.batch([
       this.env.DB.prepare(
@@ -338,6 +443,69 @@ export class AgentSession extends DurableObject<Env> {
           WHERE deployment_id = ? AND command_id = ?`
       ).bind(ack.result_code, ack.target_message_id ?? null, this.env.DEPLOYMENT_ID, ack.command_id)
     ]);
+  }
+
+  private async storeCommandStart(socket: WebSocket, start: CommandStart): Promise<void> {
+    if (start.deployment_id !== this.env.DEPLOYMENT_ID) throw new Error("WRONG_DEPLOYMENT");
+    this.purgeExpiredSessionRows();
+    const existingReceipt = this.receipt(start.command_id);
+    const existingExecution = this.ctx.storage.sql
+      .exec<{ command_id: string }>(
+        "SELECT command_id FROM executing_commands WHERE command_id = ?",
+        start.command_id
+      )
+      .toArray()[0];
+    if (existingReceipt !== null || existingExecution !== undefined) {
+      socket.send(
+        JSON.stringify({
+          type: "command_start_ack",
+          command_id: start.command_id,
+          deployment_id: this.env.DEPLOYMENT_ID,
+          accepted: false,
+          duplicate: true
+        })
+      );
+      return;
+    }
+    const pending = this.ctx.storage.sql
+      .exec<PendingRow>(
+        "SELECT envelope_json FROM pending_commands WHERE command_id = ?",
+        start.command_id
+      )
+      .toArray()[0];
+    if (pending === undefined) {
+      socket.send(
+        JSON.stringify({
+          type: "command_start_ack",
+          command_id: start.command_id,
+          deployment_id: this.env.DEPLOYMENT_ID,
+          accepted: false,
+          duplicate: true
+        })
+      );
+      return;
+    }
+    const expiresAt = Date.now() + 24 * 60 * 60_000;
+    this.ctx.storage.sql.exec(
+      "INSERT INTO executing_commands (command_id, envelope_json, expires_at) VALUES (?, ?, ?)",
+      start.command_id,
+      pending.envelope_json,
+      expiresAt
+    );
+    this.ctx.storage.sql.exec(
+      "DELETE FROM pending_commands WHERE command_id = ?",
+      start.command_id
+    );
+    await this.scheduleCleanup(expiresAt);
+    socket.send(
+      JSON.stringify({
+        type: "command_start_ack",
+        command_id: start.command_id,
+        deployment_id: this.env.DEPLOYMENT_ID,
+        accepted: true,
+        duplicate: false
+      })
+    );
   }
 
   private async ensureDeployment(): Promise<void> {
@@ -578,6 +746,19 @@ export class AgentSession extends DurableObject<Env> {
     await this.ensureDeployment();
     const settings = managedRoomSettingsSchema.parse(event.room.settings);
     const now = Date.now();
+    const conflictingOwner = await this.env.DB.prepare(
+      `SELECT channel_id FROM managed_voice_channels
+        WHERE deployment_id = ? AND guild_id = ? AND owner_user_id = ? AND channel_id <> ?
+        LIMIT 1`
+    )
+      .bind(
+        event.room.deployment_id,
+        event.room.guild_id,
+        event.room.owner_user_id,
+        event.room.channel_id
+      )
+      .first<{ channel_id: string }>();
+    if (conflictingOwner !== null) throw new Error("OWNER_ALREADY_HAS_ROOM");
     await this.env.DB.prepare(
       `INSERT INTO managed_voice_channels
         (channel_id, deployment_id, guild_id, owner_user_id, category_id,
@@ -638,6 +819,7 @@ export class AgentSession extends DurableObject<Env> {
 
   private status(): SessionStatus {
     this.purgeExpiredSessionRows();
+    this.enforceAgentSessions();
     const row = this.ctx.storage.sql
       .exec<SessionRow>(
         "SELECT status_json, last_heartbeat, last_error FROM session_state WHERE id = 1"
@@ -646,7 +828,10 @@ export class AgentSession extends DurableObject<Env> {
     const status = row?.status_json ? (JSON.parse(row.status_json) as AgentStatus) : null;
     const pending = this.ctx.storage.sql
       .exec<{ count: number }>(
-        "SELECT COUNT(*) AS count FROM pending_commands WHERE expires_at > ?",
+        `SELECT
+           (SELECT COUNT(*) FROM pending_commands WHERE expires_at > ?) +
+           (SELECT COUNT(*) FROM executing_commands WHERE expires_at > ?) AS count`,
+        Date.now(),
         Date.now()
       )
       .one();
@@ -655,7 +840,7 @@ export class AgentSession extends DurableObject<Env> {
       heartbeatStale:
         row?.last_heartbeat === null ||
         row?.last_heartbeat === undefined ||
-        Date.now() - row.last_heartbeat > 45_000,
+        Date.now() - row.last_heartbeat > agentHeartbeatStaleMs,
       lastHeartbeat: row?.last_heartbeat ?? null,
       status,
       pendingCommands: pending?.count ?? 0,
@@ -673,15 +858,20 @@ export class AgentSession extends DurableObject<Env> {
     } catch {
       // D1 can be temporarily unavailable; retain only the bounded, redacted event.
     }
+    const pending = this.ctx.storage.sql
+      .exec<{ count: number }>("SELECT COUNT(*) AS count FROM audit_outbox")
+      .one().count;
+    if (pending >= 100) {
+      this.ctx.storage.sql.exec(
+        "UPDATE session_state SET last_error = ? WHERE id = 1",
+        "AUDIT_OUTBOX_FULL"
+      );
+      return new Response("Audit storage unavailable", { status: 507 });
+    }
     this.ctx.storage.sql.exec(
       "INSERT INTO audit_outbox (event_json, created_at) VALUES (?, ?)",
       event,
       Date.now()
-    );
-    this.ctx.storage.sql.exec(
-      `DELETE FROM audit_outbox WHERE id NOT IN (
-        SELECT id FROM audit_outbox ORDER BY id DESC LIMIT 100
-      )`
     );
     await this.scheduleCleanup(Date.now() + 5_000);
     return new Response(null, { status: 204 });
@@ -694,6 +884,11 @@ export class AgentSession extends DurableObject<Env> {
       await this.persistAuditEvent(JSON.parse(row.event_json) as Record<string, unknown>);
       this.ctx.storage.sql.exec("DELETE FROM audit_outbox WHERE id = ?", row.id);
     }
+    this.ctx.storage.sql.exec(
+      `UPDATE session_state
+          SET last_error = CASE WHEN last_error = 'AUDIT_OUTBOX_FULL' THEN NULL ELSE last_error END
+        WHERE id = 1`
+    );
   }
 
   private async storeStateEvent(event: PersistentAgentEvent): Promise<void> {
@@ -706,26 +901,43 @@ export class AgentSession extends DurableObject<Env> {
           ? event.config.deployment_id
           : event.target.deployment_id;
     if (deploymentId !== this.env.DEPLOYMENT_ID) throw new Error("WRONG_DEPLOYMENT");
+    const stateKey = this.stateEventKey(event);
     const pending = this.ctx.storage.sql
-      .exec<{ count: number }>("SELECT COUNT(*) AS count FROM state_outbox")
+      .exec<{ count: number }>("SELECT COUNT(*) AS count FROM state_outbox_v2")
       .one().count;
-    if (pending === 0) {
+    const blocked = this.ctx.storage.sql
+      .exec<{ count: number }>("SELECT COUNT(*) AS count FROM state_dead_letters")
+      .one().count;
+    if (pending === 0 && blocked === 0) {
       try {
         await this.persistStateEvent(event);
+        this.ctx.storage.sql.exec("DELETE FROM state_dead_letters WHERE state_key = ?", stateKey);
         return;
       } catch {
         // Preserve ordering by putting the first failed write into the same queue as later events.
       }
     }
+    const existing = this.ctx.storage.sql
+      .exec<{ state_key: string }>(
+        "SELECT state_key FROM state_outbox_v2 WHERE state_key = ?",
+        stateKey
+      )
+      .toArray()[0];
+    if (pending >= 1000 && existing === undefined) {
+      this.ctx.storage.sql.exec(
+        "UPDATE session_state SET last_error = ? WHERE id = 1",
+        "STATE_OUTBOX_FULL"
+      );
+      throw new Error("STATE_OUTBOX_FULL");
+    }
     this.ctx.storage.sql.exec(
-      "INSERT INTO state_outbox (event_json, created_at) VALUES (?, ?)",
+      `INSERT INTO state_outbox_v2 (state_key, event_json, created_at) VALUES (?, ?, ?)
+       ON CONFLICT(state_key) DO UPDATE SET
+         event_json = excluded.event_json,
+         created_at = excluded.created_at`,
+      stateKey,
       JSON.stringify(event),
       Date.now()
-    );
-    this.ctx.storage.sql.exec(
-      `DELETE FROM state_outbox WHERE id NOT IN (
-        SELECT id FROM state_outbox ORDER BY id DESC LIMIT 1000
-      )`
     );
     this.ctx.storage.sql.exec(
       "UPDATE session_state SET last_error = ? WHERE id = 1",
@@ -737,24 +949,116 @@ export class AgentSession extends DurableObject<Env> {
 
   private async flushStateOutbox(): Promise<void> {
     for (const row of this.ctx.storage.sql.exec<StateOutboxRow>(
-      "SELECT id, event_json FROM state_outbox ORDER BY id LIMIT 1000"
+      "SELECT state_key, event_json FROM state_outbox_v2 ORDER BY created_at, state_key LIMIT 1000"
     )) {
-      const parsed = agentMessageSchema.parse(JSON.parse(row.event_json));
+      const candidate = agentMessageSchema.safeParse(JSON.parse(row.event_json));
       if (
-        parsed.type !== "managed_room_event" &&
-        parsed.type !== "guild_config_event" &&
-        parsed.type !== "authorized_target_event"
+        !candidate.success ||
+        (candidate.data.type !== "managed_room_event" &&
+          candidate.data.type !== "guild_config_event" &&
+          candidate.data.type !== "authorized_target_event")
       ) {
-        throw new Error("INVALID_STATE_OUTBOX_EVENT");
+        this.deadLetterStateEvent(row, "INVALID_STATE_OUTBOX_EVENT");
+        continue;
       }
-      await this.persistStateEvent(parsed);
-      this.ctx.storage.sql.exec("DELETE FROM state_outbox WHERE id = ?", row.id);
+      try {
+        await this.persistStateEvent(candidate.data);
+        this.ctx.storage.sql.exec("DELETE FROM state_outbox_v2 WHERE state_key = ?", row.state_key);
+        this.ctx.storage.sql.exec(
+          "DELETE FROM state_dead_letters WHERE state_key = ?",
+          row.state_key
+        );
+      } catch (error) {
+        const code = error instanceof Error ? error.message : "STATE_PERSIST_FAILED";
+        if (code === "OWNER_ALREADY_HAS_ROOM" || code === "WRONG_DEPLOYMENT") {
+          this.deadLetterStateEvent(row, code);
+          continue;
+        }
+        throw error;
+      }
+    }
+    const deadLetters = this.ctx.storage.sql
+      .exec<{ count: number }>("SELECT COUNT(*) AS count FROM state_dead_letters")
+      .one().count;
+    if (deadLetters > 0) {
+      this.ctx.storage.sql.exec(
+        "UPDATE session_state SET last_error = ? WHERE id = 1",
+        "STATE_RECONCILIATION_BLOCKED"
+      );
+      throw new Error("STATE_RECONCILIATION_BLOCKED");
     }
     this.ctx.storage.sql.exec(
       `UPDATE session_state
-          SET last_error = CASE WHEN last_error = 'D1_STATE_EVENT_QUEUED' THEN NULL ELSE last_error END
+          SET last_error = CASE
+            WHEN last_error IN ('D1_STATE_EVENT_QUEUED', 'STATE_OUTBOX_FULL') THEN NULL
+            ELSE last_error
+          END
         WHERE id = 1`
     );
+  }
+
+  private deadLetterStateEvent(row: StateOutboxRow, code: string): void {
+    this.ctx.storage.sql.exec(
+      `INSERT INTO state_dead_letters (state_key, event_json, error_code, created_at)
+       VALUES (?, ?, ?, ?)
+       ON CONFLICT(state_key) DO UPDATE SET
+         event_json = excluded.event_json,
+         error_code = excluded.error_code,
+         created_at = excluded.created_at`,
+      row.state_key,
+      row.event_json,
+      code.slice(0, 120),
+      Date.now()
+    );
+    this.ctx.storage.sql.exec("DELETE FROM state_outbox_v2 WHERE state_key = ?", row.state_key);
+  }
+
+  private stateEventKey(event: PersistentAgentEvent): string {
+    if (event.type === "authorized_target_event") return `target:${event.target.deployment_id}`;
+    if (event.type === "guild_config_event") return `guild:${event.config.guild_id}`;
+    const channelId = event.operation === "upsert" ? event.room.channel_id : event.channel_id;
+    return `room:${channelId}`;
+  }
+
+  private migrateLegacyStateOutbox(): void {
+    for (const row of this.ctx.storage.sql.exec<{ event_json: string; id: number }>(
+      "SELECT id, event_json FROM state_outbox ORDER BY id"
+    )) {
+      let input: unknown;
+      try {
+        input = JSON.parse(row.event_json);
+      } catch {
+        input = null;
+      }
+      const parsed = agentMessageSchema.safeParse(input);
+      if (
+        !parsed.success ||
+        (parsed.data.type !== "managed_room_event" &&
+          parsed.data.type !== "guild_config_event" &&
+          parsed.data.type !== "authorized_target_event")
+      ) {
+        this.ctx.storage.sql.exec(
+          `INSERT OR REPLACE INTO state_dead_letters
+            (state_key, event_json, error_code, created_at) VALUES (?, ?, ?, ?)`,
+          `legacy:${row.id}`,
+          row.event_json,
+          "INVALID_LEGACY_STATE_OUTBOX_EVENT",
+          Date.now()
+        );
+      } else {
+        const stateKey = this.stateEventKey(parsed.data);
+        this.ctx.storage.sql.exec(
+          `INSERT INTO state_outbox_v2 (state_key, event_json, created_at) VALUES (?, ?, ?)
+           ON CONFLICT(state_key) DO UPDATE SET
+             event_json = excluded.event_json,
+             created_at = excluded.created_at`,
+          stateKey,
+          row.event_json,
+          Date.now()
+        );
+      }
+      this.ctx.storage.sql.exec("DELETE FROM state_outbox WHERE id = ?", row.id);
+    }
   }
 
   private async persistStateEvent(event: PersistentAgentEvent): Promise<void> {
@@ -829,7 +1133,9 @@ export class AgentSession extends DurableObject<Env> {
   private purgeExpiredSessionRows(now = Date.now()): void {
     this.ctx.storage.sql.exec("DELETE FROM nonces WHERE expires_at <= ?", now);
     this.ctx.storage.sql.exec("DELETE FROM pending_commands WHERE expires_at <= ?", now);
+    this.ctx.storage.sql.exec("DELETE FROM executing_commands WHERE expires_at <= ?", now);
     this.ctx.storage.sql.exec("DELETE FROM receipts WHERE expires_at <= ?", now);
+    this.ctx.storage.sql.exec("DELETE FROM interaction_ids WHERE expires_at <= ?", now);
   }
 
   private async scheduleCleanup(expiresAt: number): Promise<void> {
@@ -841,6 +1147,57 @@ export class AgentSession extends DurableObject<Env> {
     if (kid === this.env.AGENT_KEY_ID) return this.env.AGENT_AUTH_SECRET;
     if (kid === this.env.AGENT_PREVIOUS_KEY_ID) return this.env.AGENT_PREVIOUS_AUTH_SECRET;
     return undefined;
+  }
+
+  private agentSocketAuthorized(socket: WebSocket, now = Date.now()): boolean {
+    const tags = this.ctx.getTags(socket);
+    const kid = tags.find((tag) => tag.startsWith("kid:"))?.slice("kid:".length);
+    const expiresAt = Number(
+      tags.find((tag) => tag.startsWith("expires:"))?.slice("expires:".length)
+    );
+    return (
+      kid !== undefined &&
+      this.secretForKid(kid) !== undefined &&
+      Number.isSafeInteger(expiresAt) &&
+      expiresAt > now
+    );
+  }
+
+  private enforceAgentSessions(now = Date.now()): void {
+    const heartbeat = this.ctx.storage.sql
+      .exec<{ last_heartbeat: number | null }>(
+        "SELECT last_heartbeat FROM session_state WHERE id = 1"
+      )
+      .one().last_heartbeat;
+    for (const socket of this.ctx.getWebSockets("agent")) {
+      const authorized = this.agentSocketAuthorized(socket, now);
+      const stale = heartbeat === null || now - heartbeat > agentHeartbeatStaleMs;
+      if (!authorized || stale) {
+        socket.close(1008, authorized ? "stale agent session" : "agent session expired");
+        this.ctx.storage.sql.exec(
+          "UPDATE session_state SET last_error = ? WHERE id = 1",
+          authorized ? "AGENT_HEARTBEAT_STALE" : "AGENT_SESSION_EXPIRED"
+        );
+      }
+    }
+  }
+
+  private nextAgentSessionDeadline(now = Date.now()): number | null {
+    const socket = this.ctx.getWebSockets("agent")[0];
+    if (socket === undefined) return null;
+    const tags = this.ctx.getTags(socket);
+    const expiresAt = Number(
+      tags.find((tag) => tag.startsWith("expires:"))?.slice("expires:".length)
+    );
+    const heartbeat = this.ctx.storage.sql
+      .exec<{ last_heartbeat: number | null }>(
+        "SELECT last_heartbeat FROM session_state WHERE id = 1"
+      )
+      .one().last_heartbeat;
+    const heartbeatDeadline = (heartbeat ?? now) + agentHeartbeatStaleMs;
+    return Number.isSafeInteger(expiresAt)
+      ? Math.min(expiresAt, heartbeatDeadline)
+      : heartbeatDeadline;
   }
 
   private secretsByKeyId(): ReadonlyMap<string, string> {

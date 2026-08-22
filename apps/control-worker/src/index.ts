@@ -6,6 +6,7 @@ import {
   type ControlAction,
   type UnsignedCommandEnvelope
 } from "@discord-vc-control/contracts";
+import { controlEnvironmentSchema } from "@discord-vc-control/config";
 import { sanitizeRelayText, sha256Hex, signCommandEnvelope } from "@discord-vc-control/security";
 
 import { AgentSession } from "./agent-session.js";
@@ -14,7 +15,10 @@ import { authorizeInteraction } from "./authorization.js";
 import {
   deferredInteractionResponse,
   editInteractionResponse,
+  hasDiscordSignatureHeaders,
+  InteractionBodyTooLargeError,
   interactionResponse,
+  readInteractionBody,
   verifyDiscordRequest
 } from "./discord.js";
 import type { DiscordInteraction, Env, SessionStatus } from "./types.js";
@@ -23,6 +27,31 @@ export { AgentSession };
 
 function sessionStub(env: Env): DurableObjectStub {
   return env.AGENT_SESSION.get(env.AGENT_SESSION.idFromName(env.DEPLOYMENT_ID));
+}
+
+export async function commandIdForInteraction(
+  deploymentId: string,
+  applicationId: string,
+  interactionId: string
+): Promise<string> {
+  const digest = await sha256Hex(`${deploymentId}:${applicationId}:${interactionId}`);
+  const variant = ((Number.parseInt(digest[16] ?? "0", 16) & 0x3) | 0x8).toString(16);
+  return `${digest.slice(0, 8)}-${digest.slice(8, 12)}-5${digest.slice(13, 16)}-${variant}${digest.slice(17, 20)}-${digest.slice(20, 32)}`;
+}
+
+async function claimCommandInteraction(
+  env: Env,
+  interactionId: string,
+  commandId: string
+): Promise<boolean> {
+  const response = await sessionStub(env).fetch("https://session/interactions", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ interaction_id: interactionId, command_id: commandId })
+  });
+  if (!response.ok) throw new Error(`INTERACTION_CLAIM_${response.status}`);
+  const result = await response.json<{ duplicate: boolean }>();
+  return !result.duplicate;
 }
 
 function parseSubcommand(interaction: DiscordInteraction): {
@@ -87,6 +116,7 @@ async function dispatchCommand(
   action: ControlAction,
   values: Record<string, string | number | boolean>,
   actorUserId: string,
+  commandId: string,
   env: Env
 ): Promise<void> {
   let payload: Record<string, unknown> = {};
@@ -111,10 +141,10 @@ async function dispatchCommand(
   const now = Date.now();
   const unsigned: UnsignedCommandEnvelope = {
     version: 1,
-    command_id: crypto.randomUUID(),
+    command_id: commandId,
     issued_at: now,
     expires_at: now + commandLifetimeMs,
-    nonce: crypto.randomUUID(),
+    nonce: `discord:${interaction.id}`,
     actor_user_id: actorUserId,
     control_guild_id: controlGuildId,
     control_channel_id: controlChannelId,
@@ -132,7 +162,7 @@ async function dispatchCommand(
       resultCode: "QUEUED"
     });
   } catch {
-    await sessionStub(env).fetch("https://session/audit-outbox", {
+    const fallback = await sessionStub(env).fetch("https://session/audit-outbox", {
       method: "POST",
       body: JSON.stringify({
         deployment_id: envelope.deployment_id,
@@ -150,6 +180,7 @@ async function dispatchCommand(
         expires_at: now + 30 * 24 * 60 * 60_000
       })
     });
+    if (!fallback.ok) throw new Error(`AUDIT_DURABILITY_${fallback.status}`);
   }
   const queued = await sessionStub(env).fetch("https://session/commands", {
     method: "POST",
@@ -173,7 +204,18 @@ async function handleInteraction(
   env: Env,
   context: ExecutionContext
 ): Promise<Response> {
-  const rawBody = await request.text();
+  if (!hasDiscordSignatureHeaders(request)) {
+    return new Response("Invalid request signature", { status: 401 });
+  }
+  let rawBody: string;
+  try {
+    rawBody = await readInteractionBody(request);
+  } catch (error) {
+    if (error instanceof InteractionBodyTooLargeError) {
+      return new Response("Request body too large", { status: 413 });
+    }
+    return new Response("Invalid request body", { status: 400 });
+  }
   if (!(await verifyDiscordRequest(request, rawBody, env.CONTROL_DISCORD_PUBLIC_KEY))) {
     return new Response("Invalid request signature", { status: 401 });
   }
@@ -230,12 +272,21 @@ async function handleInteraction(
         : "";
     return interactionResponse(`${lines.join("\n")}${suffix}`);
   }
+  const commandId = await commandIdForInteraction(
+    env.DEPLOYMENT_ID,
+    interaction.application_id,
+    interaction.id
+  );
+  if (!(await claimCommandInteraction(env, interaction.id, commandId))) {
+    return deferredInteractionResponse();
+  }
   context.waitUntil(
     dispatchCommand(
       interaction,
       parsed.action,
       parsed.values,
       authorization.actorUserId,
+      commandId,
       env
     ).catch(async (error: unknown) => {
       const code = error instanceof Error ? error.message.slice(0, 120) : "COMMAND_FAILED";
@@ -263,6 +314,9 @@ async function handleInternalStatus(request: Request, env: Env): Promise<Respons
 
 export default {
   async fetch(request: Request, env: Env, context: ExecutionContext): Promise<Response> {
+    if (!controlEnvironmentSchema.safeParse(env).success) {
+      return new Response("Service unavailable", { status: 503 });
+    }
     const url = new URL(request.url);
     if (url.pathname === "/healthz" && request.method === "GET") {
       return Response.json({ ok: true, service: "control-worker" });
@@ -283,6 +337,7 @@ export default {
   },
 
   scheduled(_event: ScheduledController, env: Env, context: ExecutionContext): void {
+    controlEnvironmentSchema.parse(env);
     context.waitUntil(purgeExpiredAudit(env));
   }
 } satisfies ExportedHandler<Env>;

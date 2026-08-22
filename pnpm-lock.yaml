@@ -47,6 +47,9 @@ importers:
 
   apps/control-worker:
     dependencies:
+      '@discord-vc-control/config':
+        specifier: workspace:*
+        version: link:../../packages/config
       '@discord-vc-control/contracts':
         specifier: workspace:*
         version: link:../../packages/contracts
@@ -93,6 +96,12 @@ importers:
       '@cloudflare/containers':
         specifier: 0.3.7
         version: 0.3.7
+      '@discord-vc-control/cloudflare-voice-probe':
+        specifier: workspace:*
+        version: link:../../spikes/cloudflare-voice-probe
+      '@discord-vc-control/config':
+        specifier: workspace:*
+        version: link:../../packages/config
 
   packages/config:
     dependencies:

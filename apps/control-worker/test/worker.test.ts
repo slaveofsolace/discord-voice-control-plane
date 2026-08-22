@@ -7,9 +7,13 @@ import {
   SELF,
   type D1Migration
 } from "cloudflare:test";
-import { beforeAll, describe, expect, it, vi } from "vitest";
+import { beforeAll, describe, expect, it } from "vitest";
 
-import { signCommandEnvelope } from "@discord-vc-control/security";
+import {
+  agentHandshakePayload,
+  signAgentHandshake,
+  signCommandEnvelope
+} from "@discord-vc-control/security";
 
 import { authorizeInteraction } from "../src/authorization.js";
 import { purgeExpiredAudit, recentAudit } from "../src/audit.js";
@@ -20,6 +24,36 @@ const testEnv = env as typeof env & { TEST_MIGRATIONS: D1Migration[] };
 beforeAll(async () => {
   await applyD1Migrations(env.DB, testEnv.TEST_MIGRATIONS);
 });
+
+async function openAgentSocket(stub: DurableObjectStub): Promise<WebSocket> {
+  const timestamp = Date.now();
+  const nonce = `${crypto.randomUUID()}${crypto.randomUUID()}`;
+  const signature = await signAgentHandshake(
+    agentHandshakePayload({
+      agentId: env.DEPLOYMENT_ID,
+      method: "GET",
+      nonce,
+      path: "/agent/ws",
+      timestamp
+    }),
+    env.AGENT_AUTH_SECRET
+  );
+  const response = await stub.fetch("https://session/agent/ws", {
+    headers: {
+      Upgrade: "websocket",
+      "x-agent-id": env.DEPLOYMENT_ID,
+      "x-agent-key-id": env.AGENT_KEY_ID,
+      "x-agent-nonce": nonce,
+      "x-agent-signature": signature,
+      "x-agent-timestamp": String(timestamp)
+    }
+  });
+  expect(response.status).toBe(101);
+  const socket = response.webSocket;
+  if (socket === null) throw new Error("TEST_AGENT_SOCKET_MISSING");
+  socket.accept();
+  return socket;
+}
 
 describe("control worker", () => {
   it("serves only a minimal public health response", async () => {
@@ -45,11 +79,13 @@ describe("control worker", () => {
     const stub = env.AGENT_SESSION.get(
       env.AGENT_SESSION.idFromName(`heartbeat-${crypto.randomUUID()}`)
     );
+    const clientSocket = await openAgentSocket(stub);
     const before = Date.now();
     await runInDurableObject(stub, async (instance, state) => {
-      const close = vi.fn();
+      const serverSocket = state.getWebSockets("agent")[0];
+      if (serverSocket === undefined) throw new Error("TEST_SERVER_SOCKET_MISSING");
       await instance.webSocketMessage(
-        { close } as unknown as WebSocket,
+        serverSocket,
         JSON.stringify({
           type: "heartbeat",
           deployment_id: env.DEPLOYMENT_ID,
@@ -64,18 +100,25 @@ describe("control worker", () => {
         .one();
       expect(row.last_heartbeat).toBeGreaterThanOrEqual(before);
       expect(row.last_heartbeat).toBeLessThanOrEqual(Date.now());
-      expect(close).not.toHaveBeenCalled();
     });
+    clientSocket.close();
   });
 
   it("rejects a heartbeat for another deployment before updating liveness", async () => {
     const stub = env.AGENT_SESSION.get(
       env.AGENT_SESSION.idFromName(`wrong-heartbeat-${crypto.randomUUID()}`)
     );
+    const clientSocket = await openAgentSocket(stub);
     await runInDurableObject(stub, async (instance, state) => {
-      const close = vi.fn();
+      const serverSocket = state.getWebSockets("agent")[0];
+      if (serverSocket === undefined) throw new Error("TEST_SERVER_SOCKET_MISSING");
+      const before = state.storage.sql
+        .exec<{ last_heartbeat: number | null }>(
+          "SELECT last_heartbeat FROM session_state WHERE id = 1"
+        )
+        .one().last_heartbeat;
       await instance.webSocketMessage(
-        { close } as unknown as WebSocket,
+        serverSocket,
         JSON.stringify({
           type: "heartbeat",
           deployment_id: "another-deployment",
@@ -88,9 +131,9 @@ describe("control worker", () => {
           "SELECT last_error, last_heartbeat FROM session_state WHERE id = 1"
         )
         .one();
-      expect(row).toMatchObject({ last_error: "WRONG_DEPLOYMENT", last_heartbeat: null });
-      expect(close).toHaveBeenCalledWith(1008, "invalid agent message");
+      expect(row).toMatchObject({ last_error: "WRONG_DEPLOYMENT", last_heartbeat: before });
     });
+    clientSocket.close();
   });
 
   it("enforces application, guild, channel, actor, and elevation allowlists", () => {
@@ -152,6 +195,94 @@ describe("control worker", () => {
     const second = await request();
     expect(second.status).toBe(200);
     await expect(second.json()).resolves.toMatchObject({ queued: true, duplicate: true });
+  });
+
+  it("claims one Discord interaction ID durably", async () => {
+    const objectId = env.AGENT_SESSION.idFromName(`interaction-${crypto.randomUUID()}`);
+    let stub = env.AGENT_SESSION.get(objectId);
+    const body = JSON.stringify({
+      interaction_id: "100000000000000010",
+      command_id: "00000000-0000-5000-8000-000000000001"
+    });
+    const claim = () =>
+      stub.fetch("https://session/interactions", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body
+      });
+    await expect((await claim()).json()).resolves.toMatchObject({ duplicate: false });
+    await expect((await claim()).json()).resolves.toMatchObject({ duplicate: true });
+    await abortAllDurableObjects();
+    stub = env.AGENT_SESSION.get(objectId);
+    await expect((await claim()).json()).resolves.toMatchObject({ duplicate: true });
+  });
+
+  it("moves a command to a durable executing ledger before side effects", async () => {
+    const now = Date.now();
+    const envelope = await signCommandEnvelope(
+      {
+        version: 1,
+        command_id: crypto.randomUUID(),
+        issued_at: now,
+        expires_at: now + 30_000,
+        nonce: crypto.randomUUID(),
+        actor_user_id: "100000000000000004",
+        control_guild_id: env.CONTROL_GUILD_ID,
+        control_channel_id: "100000000000000003",
+        deployment_id: env.DEPLOYMENT_ID,
+        tenant_id: env.TENANT_ID,
+        action: "reconnect",
+        payload: {},
+        kid: env.AGENT_KEY_ID
+      },
+      env.AGENT_AUTH_SECRET
+    );
+    const objectId = env.AGENT_SESSION.idFromName(`executing-${crypto.randomUUID()}`);
+    let stub = env.AGENT_SESSION.get(objectId);
+    expect(
+      (
+        await stub.fetch("https://session/commands", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify(envelope)
+        })
+      ).status
+    ).toBe(200);
+    const clientSocket = await openAgentSocket(stub);
+    await runInDurableObject(stub, async (instance, state) => {
+      const serverSocket = state.getWebSockets("agent")[0];
+      if (serverSocket === undefined) throw new Error("TEST_SERVER_SOCKET_MISSING");
+      await instance.webSocketMessage(
+        serverSocket,
+        JSON.stringify({
+          type: "command_start",
+          command_id: envelope.command_id,
+          deployment_id: env.DEPLOYMENT_ID,
+          occurred_at: Date.now()
+        })
+      );
+      const counts = state.storage.sql
+        .exec<{ executing: number; pending: number }>(
+          `SELECT
+             (SELECT COUNT(*) FROM pending_commands) AS pending,
+             (SELECT COUNT(*) FROM executing_commands) AS executing`
+        )
+        .one();
+      expect(counts).toEqual({ pending: 0, executing: 1 });
+    });
+    clientSocket.close();
+    await abortAllDurableObjects();
+    stub = env.AGENT_SESSION.get(objectId);
+    const duplicate = await stub.fetch("https://session/commands", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(envelope)
+    });
+    await expect(duplicate.json()).resolves.toMatchObject({
+      duplicate: true,
+      executing: true,
+      queued: false
+    });
   });
 
   it("rejects nonce reuse across different signed command IDs", async () => {
@@ -315,7 +446,8 @@ describe("control worker", () => {
     };
     await runInDurableObject(stub, async (_instance, state) => {
       state.storage.sql.exec(
-        "INSERT INTO state_outbox (event_json, created_at) VALUES (?, ?)",
+        "INSERT INTO state_outbox_v2 (state_key, event_json, created_at) VALUES (?, ?, ?)",
+        `guild:${guildId}`,
         JSON.stringify(event),
         Date.now()
       );
@@ -332,10 +464,94 @@ describe("control worker", () => {
     expect(stored).toEqual({ feature_profile: "presence_only", managed_rooms_enabled: 0 });
     await runInDurableObject(stub, (_instance, state) => {
       const row = state.storage.sql
-        .exec<{ count: number }>("SELECT COUNT(*) AS count FROM state_outbox")
+        .exec<{ count: number }>("SELECT COUNT(*) AS count FROM state_outbox_v2")
         .one();
       expect(row.count).toBe(0);
     });
+  });
+
+  it("fails closed instead of evicting a full state outbox", async () => {
+    const stub = env.AGENT_SESSION.get(
+      env.AGENT_SESSION.idFromName(`state-full-${crypto.randomUUID()}`)
+    );
+    const clientSocket = await openAgentSocket(stub);
+    await runInDurableObject(stub, async (instance, state) => {
+      for (let index = 0; index < 1_000; index += 1) {
+        state.storage.sql.exec(
+          "INSERT INTO state_outbox_v2 (state_key, event_json, created_at) VALUES (?, '{}', ?)",
+          `seed:${index}`,
+          index
+        );
+      }
+      const serverSocket = state.getWebSockets("agent")[0];
+      if (serverSocket === undefined) throw new Error("TEST_SERVER_SOCKET_MISSING");
+      await instance.webSocketMessage(
+        serverSocket,
+        JSON.stringify({
+          type: "guild_config_event",
+          config: {
+            deployment_id: env.DEPLOYMENT_ID,
+            guild_id: "100000000000000077",
+            feature_profile: "presence_only",
+            managed_rooms_enabled: false,
+            prefix_commands_enabled: false,
+            category_id: null,
+            lobby_channel_id: null,
+            command_channel_id: null
+          }
+        })
+      );
+      const count = state.storage.sql
+        .exec<{ count: number }>("SELECT COUNT(*) AS count FROM state_outbox_v2")
+        .one().count;
+      const error = state.storage.sql
+        .exec<{ last_error: string | null }>("SELECT last_error FROM session_state WHERE id = 1")
+        .one().last_error;
+      expect(count).toBe(1_000);
+      expect(error).toBe("STATE_OUTBOX_FULL");
+    });
+    clientSocket.close();
+  });
+
+  it("fails closed when the audit fallback reaches capacity", async () => {
+    const stub = env.AGENT_SESSION.get(
+      env.AGENT_SESSION.idFromName(`audit-full-${crypto.randomUUID()}`)
+    );
+    await runInDurableObject(stub, (_instance, state) => {
+      for (let index = 0; index < 100; index += 1) {
+        state.storage.sql.exec(
+          "INSERT INTO audit_outbox (event_json, created_at) VALUES ('{}', ?)",
+          index
+        );
+      }
+    });
+    const response = await stub.fetch("https://session/audit-outbox", {
+      method: "POST",
+      body: "{}"
+    });
+    expect(response.status).toBe(507);
+    await runInDurableObject(stub, (_instance, state) => {
+      expect(
+        state.storage.sql
+          .exec<{ count: number }>("SELECT COUNT(*) AS count FROM audit_outbox")
+          .one().count
+      ).toBe(100);
+    });
+  });
+
+  it("closes an authenticated agent after heartbeat staleness", async () => {
+    const stub = env.AGENT_SESSION.get(
+      env.AGENT_SESSION.idFromName(`stale-agent-${crypto.randomUUID()}`)
+    );
+    const clientSocket = await openAgentSocket(stub);
+    const closed = new Promise<number>((resolve) => {
+      clientSocket.addEventListener("close", (event) => resolve(event.code), { once: true });
+    });
+    await runInDurableObject(stub, async (instance, state) => {
+      state.storage.sql.exec("UPDATE session_state SET last_heartbeat = 0 WHERE id = 1");
+      await instance.alarm();
+    });
+    await expect(closed).resolves.toBe(1008);
   });
 
   it("enforces audit retention and the hard result cap against migrated D1", async () => {

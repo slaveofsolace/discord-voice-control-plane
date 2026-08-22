@@ -15,14 +15,10 @@ const configurations: Record<
     config: "apps/voice-host-worker/wrangler.jsonc",
     requiredSecrets: ["DISCORD_BOT_TOKEN", "AGENT_AUTH_SECRET"],
     optionalSecrets: ["AGENT_PREVIOUS_AUTH_SECRET"]
-  },
-  probe: {
-    config: "spikes/cloudflare-voice-probe/wrangler.jsonc",
-    requiredSecrets: ["DISCORD_BOT_TOKEN"]
   }
 };
 const selected = service === undefined ? undefined : configurations[service];
-if (selected === undefined) throw new Error("USAGE_SECRETS_CONTROL_VOICE_HOST_OR_PROBE");
+if (selected === undefined) throw new Error("USAGE_SECRETS_CONTROL_OR_VOICE_HOST");
 
 const pnpm = process.platform === "win32" ? "pnpm.cmd" : "pnpm";
 const secrets = [

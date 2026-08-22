@@ -20,7 +20,47 @@ const staffOverwriteId = "100000000000000099";
 
 function fixture(ownerPresent = true) {
   const events: unknown[] = [];
-  const overwriteEdit = vi.fn().mockResolvedValue(undefined);
+  const overwriteCache = new Collection<
+    string,
+    {
+      allow: { has: (permission: bigint) => boolean };
+      deny: { has: (permission: bigint) => boolean };
+    }
+  >();
+  const overwriteBits = new Map<string, { allow: Set<bigint>; deny: Set<bigint> }>();
+  const cacheOverwrite = (id: string): void => {
+    const bits = overwriteBits.get(id) ?? { allow: new Set<bigint>(), deny: new Set<bigint>() };
+    overwriteBits.set(id, bits);
+    overwriteCache.set(id, {
+      allow: { has: (permission) => bits.allow.has(permission) },
+      deny: { has: (permission) => bits.deny.has(permission) }
+    });
+  };
+  cacheOverwrite(ownerId);
+  overwriteBits.get(ownerId)?.allow.add(PermissionFlagsBits.Connect);
+  overwriteBits.get(ownerId)?.allow.add(PermissionFlagsBits.ViewChannel);
+  const overwriteEdit = vi
+    .fn()
+    .mockImplementation(
+      async (
+        id: string,
+        permissions: { Connect?: boolean | null; ViewChannel?: boolean | null }
+      ) => {
+        cacheOverwrite(id);
+        const bits = overwriteBits.get(id);
+        if (bits === undefined) throw new Error("TEST_OVERWRITE_MISSING");
+        for (const [value, permission] of [
+          [permissions.Connect, PermissionFlagsBits.Connect],
+          [permissions.ViewChannel, PermissionFlagsBits.ViewChannel]
+        ] as const) {
+          if (value === undefined) continue;
+          bits.allow.delete(permission);
+          bits.deny.delete(permission);
+          if (value === true) bits.allow.add(permission);
+          if (value === false) bits.deny.add(permission);
+        }
+      }
+    );
   const setName = vi.fn().mockResolvedValue(undefined);
   const setUserLimit = vi.fn().mockResolvedValue(undefined);
   const deleteChannel = vi.fn().mockResolvedValue(undefined);
@@ -38,12 +78,13 @@ function fixture(ownerPresent = true) {
     type: ChannelType.GuildVoice,
     guild,
     members,
-    permissionOverwrites: { edit: overwriteEdit },
+    permissionOverwrites: { cache: overwriteCache, edit: overwriteEdit },
     setName,
     setUserLimit,
     delete: deleteChannel
   } as unknown as VoiceChannel;
   const owner = {
+    guild,
     id: ownerId,
     displayName: "Owner",
     permissions: { has: vi.fn().mockReturnValue(false) },
@@ -51,6 +92,7 @@ function fixture(ownerPresent = true) {
     voice: { channel }
   } as unknown as GuildMember;
   const target = {
+    guild,
     id: targetId,
     displayName: "Target",
     permissions: { has: vi.fn().mockReturnValue(false) },
@@ -116,6 +158,7 @@ function fixture(ownerPresent = true) {
     guild,
     members,
     overwriteEdit,
+    overwriteBits,
     owner,
     room,
     service,
@@ -151,12 +194,14 @@ describe("managed room commands", () => {
       command_channel_id: "100000000000000007"
     });
     expect(create).not.toHaveBeenCalled();
-    expect(service.setEnabled(guild as unknown as Guild, owner, true).managed_rooms_enabled).toBe(
-      true
+    await expect(service.setEnabled(guild as unknown as Guild, owner, true)).resolves.toMatchObject(
+      {
+        managed_rooms_enabled: true
+      }
     );
-    expect(service.setEnabled(guild as unknown as Guild, owner, false).managed_rooms_enabled).toBe(
-      false
-    );
+    await expect(
+      service.setEnabled(guild as unknown as Guild, owner, false)
+    ).resolves.toMatchObject({ managed_rooms_enabled: false });
     expect(
       events.filter((event) => (event as { type?: string }).type === "guild_config_event")
     ).toHaveLength(3);
@@ -255,7 +300,7 @@ describe("managed room commands", () => {
     await expect(disabled.setup(guild as unknown as Guild, owner)).rejects.toThrow(
       "MANAGED_ROOMS_DISABLED_BY_DEPLOYMENT"
     );
-    expect(() => disabled.setEnabled(guild as unknown as Guild, owner, true)).toThrow(
+    await expect(disabled.setEnabled(guild as unknown as Guild, owner, true)).rejects.toThrow(
       "MANAGED_ROOMS_DISABLED_BY_DEPLOYMENT"
     );
 
@@ -271,9 +316,9 @@ describe("managed room commands", () => {
     await expect(unauthorizedGuild.setup(guild as unknown as Guild, owner)).rejects.toThrow(
       "MANAGED_GUILD_NOT_AUTHORIZED"
     );
-    expect(() => unauthorizedGuild.setEnabled(guild as unknown as Guild, owner, true)).toThrow(
-      "MANAGED_GUILD_NOT_AUTHORIZED"
-    );
+    await expect(
+      unauthorizedGuild.setEnabled(guild as unknown as Guild, owner, true)
+    ).rejects.toThrow("MANAGED_GUILD_NOT_AUTHORIZED");
 
     const presenceOnly = new ManagedRoomService({
       deploymentId: "test",
@@ -303,7 +348,7 @@ describe("managed room commands", () => {
     await expect(presenceOnly.setup(guild as unknown as Guild, owner)).rejects.toThrow(
       "PRESENCE_ONLY_PROFILE"
     );
-    expect(() => presenceOnly.setEnabled(guild as unknown as Guild, owner, true)).toThrow(
+    await expect(presenceOnly.setEnabled(guild as unknown as Guild, owner, true)).rejects.toThrow(
       "PRESENCE_ONLY_PROFILE"
     );
   });
@@ -312,6 +357,15 @@ describe("managed room commands", () => {
     const { owner, service } = fixture();
     await expect(service.execute({ member: owner, subcommand: "info" })).resolves.toContain(
       "Size: unlimited"
+    );
+  });
+
+  it("stops existing room commands after staff disables the feature", async () => {
+    const { guild, owner, service } = fixture();
+    (owner.permissions.has as ReturnType<typeof vi.fn>).mockReturnValue(true);
+    await service.setEnabled(guild as unknown as Guild, owner, false);
+    await expect(service.execute({ member: owner, subcommand: "info" })).rejects.toThrow(
+      "MANAGED_ROOMS_DISABLED"
     );
   });
 
@@ -383,6 +437,58 @@ describe("managed room commands", () => {
     await expect(
       absent.service.execute({ member: absent.target, subcommand: "claim" })
     ).resolves.toContain(`Owner: <@${targetId}>`);
+  });
+
+  it("rejects a claim when the claimant already owns another room", async () => {
+    const current = fixture(false);
+    const otherRoom: ManagedRoomRecord = {
+      ...current.room,
+      channel_id: "100000000000000088",
+      owner_user_id: targetId,
+      settings: { ...current.room.settings }
+    };
+    current.service.applyBootstrap({
+      ...current.bootstrap,
+      managed_rooms: [current.room, otherRoom]
+    });
+    await expect(
+      current.service.execute({ member: current.target, subcommand: "claim" })
+    ).rejects.toThrow("CLAIMANT_ALREADY_OWNS_A_ROOM");
+    expect(current.overwriteEdit).not.toHaveBeenCalled();
+  });
+
+  it("serializes concurrent claims and grants only one new owner", async () => {
+    const current = fixture(false);
+    const secondId = "100000000000000011";
+    const second = {
+      guild: current.guild,
+      id: secondId,
+      displayName: "Second",
+      permissions: { has: vi.fn().mockReturnValue(false) },
+      user: { bot: false },
+      voice: { channel: current.channel }
+    } as unknown as GuildMember;
+    current.members.set(secondId, second);
+    const results = await Promise.allSettled([
+      current.service.execute({ member: current.target, subcommand: "claim" }),
+      current.service.execute({ member: second, subcommand: "claim" })
+    ]);
+    expect(results.filter((result) => result.status === "fulfilled")).toHaveLength(1);
+    expect(results.filter((result) => result.status === "rejected")).toHaveLength(1);
+    const granted = [targetId, secondId].filter((id) =>
+      current.overwriteBits.get(id)?.allow.has(PermissionFlagsBits.Connect)
+    );
+    expect(granted).toHaveLength(1);
+  });
+
+  it("fails closed when staff changes a bot-tracked ACL bit", async () => {
+    const current = fixture();
+    await current.overwriteEdit(targetId, { Connect: false });
+    current.overwriteEdit.mockClear();
+    await expect(
+      current.service.execute({ member: current.owner, subcommand: "permit", userId: targetId })
+    ).rejects.toThrow("ACL_CHANGED_BY_STAFF");
+    expect(current.overwriteEdit).not.toHaveBeenCalled();
   });
 
   it("resets only bot-owned Connect overwrites and preserves unrelated staff entries", async () => {

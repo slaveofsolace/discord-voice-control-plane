@@ -39,6 +39,7 @@ interface ExpectedDisconnect {
 export class VoiceController {
   readonly #deploymentRelayLimiter = new FixedWindowRateLimiter(20, 60_000);
   readonly #operatorRelayLimiter = new FixedWindowRateLimiter(5, 60_000);
+  #connectionAttempt = 0;
   #connection: VoiceConnection | null = null;
   #daveEstablished = false;
   #expectedDisconnect: ExpectedDisconnect | null = null;
@@ -83,6 +84,7 @@ export class VoiceController {
     const changed =
       this.#target?.guild_id !== target?.guild_id ||
       this.#target?.voice_channel_id !== target?.voice_channel_id;
+    if (changed) this.invalidateConnectionAttempt();
     this.#target = target;
     if (changed && this.#connection !== null) this.block("AUTHORIZATION_CHANGED", "AUTH_FAILURE");
     this.publishStatus();
@@ -90,6 +92,7 @@ export class VoiceController {
 
   async applyDesiredState(desiredConnected: boolean, paused: boolean): Promise<void> {
     if (paused) {
+      this.invalidateConnectionAttempt();
       this.#machine = {
         ...this.#machine,
         state: "PAUSED",
@@ -107,6 +110,7 @@ export class VoiceController {
     }
     this.transition({ type: "LEAVE" });
     this.#machine.reason = "bootstrap_disabled";
+    this.invalidateConnectionAttempt();
     this.destroyConnection();
   }
 
@@ -127,16 +131,19 @@ export class VoiceController {
           break;
         case "leave":
           this.transition({ type: "LEAVE" });
+          this.invalidateConnectionAttempt();
           this.destroyConnection();
           summary = "Left the authorized voice channel.";
           break;
         case "reconnect":
+          this.invalidateConnectionAttempt();
           await this.disconnectForReconnect();
           await this.connect("operator_reconnect");
           summary = "Reconnected to the authorized voice channel.";
           break;
         case "pause":
           this.transition({ type: "PAUSE" });
+          this.invalidateConnectionAttempt();
           this.destroyConnection();
           summary = "Voice connection paused.";
           break;
@@ -219,6 +226,7 @@ export class VoiceController {
 
   shutdown(): void {
     this.transition({ type: "SHUTDOWN" });
+    this.invalidateConnectionAttempt();
     this.destroyConnection();
   }
 
@@ -234,6 +242,7 @@ export class VoiceController {
   }
 
   private async establishConnection(): Promise<void> {
+    const attempt = ++this.#connectionAttempt;
     const target = this.#target;
     if (target === null) {
       this.block("AUTHORIZED_TARGET_NOT_SET", "AUTH_FAILURE");
@@ -244,11 +253,13 @@ export class VoiceController {
       throw new Error("DISCORD_GATEWAY_NOT_READY");
     }
     const guild = await this.options.client.guilds.fetch(target.guild_id).catch(() => null);
+    this.assertConnectionAttempt(attempt, target);
     if (guild === null) {
       this.block("AUTHORIZED_GUILD_UNAVAILABLE", "AUTH_FAILURE");
       throw new Error("AUTHORIZED_GUILD_UNAVAILABLE");
     }
     const channel = await guild.channels.fetch(target.voice_channel_id).catch(() => null);
+    this.assertConnectionAttempt(attempt, target);
     if (channel === null) {
       this.block("TARGET_CHANNEL_DELETED", "CHANNEL_DELETED");
       throw new Error("TARGET_CHANNEL_DELETED");
@@ -258,6 +269,7 @@ export class VoiceController {
       throw new Error("AUTHORIZED_TARGET_NOT_VOICE");
     }
     const me = guild.members.me ?? (await guild.members.fetchMe());
+    this.assertConnectionAttempt(attempt, target);
     const permissions = channel.permissionsFor(me);
     if (
       !permissions.has(PermissionFlagsBits.ViewChannel) ||
@@ -268,6 +280,7 @@ export class VoiceController {
     }
     this.cancelRetry();
     if (this.#connection !== null) await this.disconnectForReconnect();
+    this.assertConnectionAttempt(attempt, target);
     this.#daveEstablished = false;
     const connection = joinVoiceChannel({
       adapterCreator: guild.voiceAdapterCreator,
@@ -278,6 +291,12 @@ export class VoiceController {
       selfDeaf: true,
       selfMute: true
     });
+    try {
+      this.assertConnectionAttempt(attempt, target);
+    } catch (error) {
+      connection.destroy();
+      throw error;
+    }
     this.#connection = connection;
     connection.on("transitioned", () => {
       if (this.#connection !== connection) return;
@@ -294,11 +313,17 @@ export class VoiceController {
     );
     try {
       await entersState(connection, VoiceConnectionStatus.Ready, 20_000);
+      this.assertConnectionAttempt(attempt, target);
       if (this.#connection !== connection) throw new Error("VOICE_CONNECTION_SUPERSEDED");
       this.#daveEstablished = this.#daveEstablished || connection.voicePrivacyCode !== undefined;
       if (!this.#daveEstablished) await this.waitForDave(connection);
       this.transition({ type: "CONNECTED" });
     } catch (error) {
+      if (error instanceof Error && error.message === "VOICE_CONNECTION_SUPERSEDED") {
+        if (this.#connection === connection) this.#connection = null;
+        if (connection.state.status !== VoiceConnectionStatus.Destroyed) connection.destroy();
+        throw error;
+      }
       if (
         this.#connection === connection &&
         (this.#machine.state === "CONNECTING" || this.#machine.state === "DEGRADED")
@@ -426,6 +451,7 @@ export class VoiceController {
       | "MAX_RETRIES"
     >
   ): void {
+    this.invalidateConnectionAttempt();
     this.#lastErrorCode = code;
     this.transition({ type: eventType });
     this.destroyConnection();
@@ -499,6 +525,25 @@ export class VoiceController {
   private cancelRetry(): void {
     if (this.#retryTimer !== null) clearTimeout(this.#retryTimer);
     this.#retryTimer = null;
+  }
+
+  private invalidateConnectionAttempt(): void {
+    this.#connectionAttempt += 1;
+  }
+
+  private assertConnectionAttempt(attempt: number, target: AuthorizedTarget): void {
+    if (
+      attempt !== this.#connectionAttempt ||
+      !this.#machine.desiredConnected ||
+      this.#machine.state === "PAUSED" ||
+      this.#machine.state === "BLOCKED" ||
+      this.#machine.state === "DISABLED" ||
+      this.#machine.state === "SHUTTING_DOWN" ||
+      this.#target?.guild_id !== target.guild_id ||
+      this.#target.voice_channel_id !== target.voice_channel_id
+    ) {
+      throw new Error("VOICE_CONNECTION_SUPERSEDED");
+    }
   }
 
   private publishStatus(): void {

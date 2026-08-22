@@ -10,10 +10,8 @@ const config =
     ? "apps/control-worker/wrangler.jsonc"
     : service === "voice-host"
       ? "apps/voice-host-worker/wrangler.jsonc"
-      : service === "probe"
-        ? "spikes/cloudflare-voice-probe/wrangler.jsonc"
-        : undefined;
-if (config === undefined) throw new Error("USAGE_ROLLBACK_CONTROL_VOICE_HOST_OR_PROBE");
+      : undefined;
+if (config === undefined) throw new Error("USAGE_ROLLBACK_CONTROL_OR_VOICE_HOST");
 const pnpm = process.platform === "win32" ? "pnpm.cmd" : "pnpm";
 await new Promise<void>((resolve, reject) => {
   const child = spawn(pnpm, ["exec", "wrangler", "rollback", versionId, "--config", config], {

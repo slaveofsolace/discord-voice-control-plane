@@ -16,12 +16,5 @@
   "durable_objects": {
     "bindings": [{ "name": "VOICE_PROBE_CONTAINER", "class_name": "VoiceProbeContainer" }]
   },
-  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["VoiceProbeContainer"] }],
-  "triggers": { "crons": ["* * * * *"] },
-  "vars": {
-    "PROBE_ENABLED": "false",
-    "PROBE_GUILD_ID": "100000000000000001",
-    "PROBE_VOICE_CHANNEL_ID": "100000000000000002",
-    "PROBE_STABLE_MS": "60000"
-  }
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["VoiceProbeContainer"] }]
 }

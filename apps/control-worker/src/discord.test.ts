@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest";
 
-import { verifyDiscordRequest } from "./discord.js";
+import {
+  InteractionBodyTooLargeError,
+  maxInteractionBodyBytes,
+  readInteractionBody,
+  verifyDiscordRequest
+} from "./discord.js";
 
 function hex(bytes: ArrayBuffer): string {
   return [...new Uint8Array(bytes)].map((byte) => byte.toString(16).padStart(2, "0")).join("");
@@ -44,5 +49,32 @@ describe("Discord request signatures", () => {
         "00".repeat(32)
       )
     ).resolves.toBe(false);
+  });
+
+  it("rejects declared and streamed bodies above the interaction limit", async () => {
+    const declared = new Request("https://control.test/discord/interactions", {
+      method: "POST",
+      headers: { "content-length": String(maxInteractionBodyBytes + 1) },
+      body: "x"
+    });
+    await expect(readInteractionBody(declared)).rejects.toBeInstanceOf(
+      InteractionBodyTooLargeError
+    );
+
+    const streamed = new Request("https://control.test/discord/interactions", {
+      method: "POST",
+      body: "x".repeat(maxInteractionBodyBytes + 1)
+    });
+    await expect(readInteractionBody(streamed)).rejects.toBeInstanceOf(
+      InteractionBodyTooLargeError
+    );
+    await expect(
+      readInteractionBody(
+        new Request("https://control.test/discord/interactions", {
+          method: "POST",
+          body: "ordinary"
+        })
+      )
+    ).resolves.toBe("ordinary");
   });
 });

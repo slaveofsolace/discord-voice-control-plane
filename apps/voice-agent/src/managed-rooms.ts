@@ -38,6 +38,7 @@ export interface RoomCommandInput {
 export class ManagedRoomService {
   readonly #configs = new Map<string, GuildConfigRecord>();
   readonly #deletionTimers = new Map<string, NodeJS.Timeout>();
+  readonly #guildOperations = new Map<string, Promise<void>>();
   readonly #rooms = new Map<string, ManagedRoomRecord>();
 
   constructor(private readonly options: ManagedRoomServiceOptions) {}
@@ -56,6 +57,10 @@ export class ManagedRoomService {
   }
 
   async setup(guild: Guild, actor: GuildMember): Promise<GuildConfigRecord> {
+    return this.withGuildLock(guild.id, () => this.setupLocked(guild, actor));
+  }
+
+  private async setupLocked(guild: Guild, actor: GuildMember): Promise<GuildConfigRecord> {
     this.requireAdministrator(actor);
     if (!this.options.managedRoomsEnabled) {
       throw new Error("MANAGED_ROOMS_DISABLED_BY_DEPLOYMENT");
@@ -66,6 +71,9 @@ export class ManagedRoomService {
       throw new Error("MANAGED_GUILD_NOT_AUTHORIZED");
     }
     let category = config?.category_id ? guild.channels.cache.get(config.category_id) : undefined;
+    category ??= guild.channels.cache.find(
+      (channel) => channel.type === ChannelType.GuildCategory && channel.name === "Temporary Voice"
+    );
     if (category?.type !== ChannelType.GuildCategory) {
       category = await guild.channels.create({
         name: "Temporary Voice",
@@ -76,6 +84,9 @@ export class ManagedRoomService {
     let lobby = config?.lobby_channel_id
       ? guild.channels.cache.get(config.lobby_channel_id)
       : undefined;
+    lobby ??= guild.channels.cache.find(
+      (channel) => channel.type === ChannelType.GuildVoice && channel.name === "Join to Create"
+    );
     if (lobby?.type !== ChannelType.GuildVoice) {
       lobby = await guild.channels.create({
         name: "Join to Create",
@@ -87,6 +98,9 @@ export class ManagedRoomService {
     let commandChannel = config?.command_channel_id
       ? guild.channels.cache.get(config.command_channel_id)
       : undefined;
+    commandChannel ??= guild.channels.cache.find(
+      (channel) => channel.type === ChannelType.GuildText && channel.name === "voice-control"
+    );
     if (commandChannel?.type !== ChannelType.GuildText) {
       commandChannel = await guild.channels.create({
         name: "voice-control",
@@ -124,7 +138,11 @@ export class ManagedRoomService {
     ].join("\n");
   }
 
-  setEnabled(guild: Guild, actor: GuildMember, enabled: boolean): GuildConfigRecord {
+  async setEnabled(guild: Guild, actor: GuildMember, enabled: boolean): Promise<GuildConfigRecord> {
+    return this.withGuildLock(guild.id, () => this.setEnabledLocked(guild, actor, enabled));
+  }
+
+  private setEnabledLocked(guild: Guild, actor: GuildMember, enabled: boolean): GuildConfigRecord {
     this.requireAdministrator(actor);
     const config = this.#configs.get(guild.id);
     if (config === undefined) throw new Error("RUN_VOICE_ADMIN_SETUP_FIRST");
@@ -183,7 +201,18 @@ export class ManagedRoomService {
       newState.channelId === config?.lobby_channel_id &&
       config.managed_rooms_enabled
     ) {
-      await this.createOrReuseRoom(newState.guild, member, config);
+      await this.withGuildLock(newState.guild.id, async () => {
+        const current = this.#configs.get(newState.guild.id);
+        if (
+          current?.feature_profile !== "managed_rooms" ||
+          !current.managed_rooms_enabled ||
+          !this.options.managedRoomsEnabled ||
+          !this.options.managedGuildIds.has(newState.guild.id)
+        ) {
+          return;
+        }
+        await this.createOrReuseRoom(newState.guild, member, current);
+      });
     }
     if (oldState.channelId !== null && this.#rooms.has(oldState.channelId)) {
       this.scheduleDeleteIfEmpty(oldState.channelId, oldState.guild);
@@ -235,11 +264,24 @@ export class ManagedRoomService {
   }
 
   async execute(input: RoomCommandInput): Promise<string> {
+    return this.withGuildLock(input.member.guild.id, () => this.executeLocked(input));
+  }
+
+  private async executeLocked(input: RoomCommandInput): Promise<string> {
     const channel = input.member.voice.channel;
     if (channel?.type !== ChannelType.GuildVoice)
       throw new Error("JOIN_A_MANAGED_VOICE_ROOM_FIRST");
     const room = this.#rooms.get(channel.id);
     if (room === undefined) throw new Error("ROOM_NOT_MANAGED_BY_THIS_BOT");
+    const config = this.#configs.get(channel.guild.id);
+    if (
+      !this.options.managedRoomsEnabled ||
+      !this.options.managedGuildIds.has(channel.guild.id) ||
+      config?.feature_profile !== "managed_rooms" ||
+      !config.managed_rooms_enabled
+    ) {
+      throw new Error("MANAGED_ROOMS_DISABLED");
+    }
     const isStaff = input.member.permissions.has(PermissionFlagsBits.ManageChannels);
     if (input.subcommand !== "claim" && room.owner_user_id !== input.member.id && !isStaff) {
       throw new Error("ROOM_OWNER_OR_STAFF_REQUIRED");
@@ -260,12 +302,18 @@ export class ManagedRoomService {
         break;
       }
       case "lock":
+        this.assertAclMatchesSettings(channel, room, channel.guild.roles.everyone.id, {
+          connect: true
+        });
         await channel.permissionOverwrites.edit(channel.guild.roles.everyone.id, {
           Connect: false
         });
         room.settings.locked = true;
         break;
       case "unlock":
+        this.assertAclMatchesSettings(channel, room, channel.guild.roles.everyone.id, {
+          connect: true
+        });
         await channel.permissionOverwrites.edit(channel.guild.roles.everyone.id, { Connect: null });
         room.settings.locked = false;
         break;
@@ -350,7 +398,7 @@ export class ManagedRoomService {
     if (channel?.type !== ChannelType.GuildVoice || this.hasHuman(channel)) return;
     const timer = setTimeout(() => {
       this.#deletionTimers.delete(channelId);
-      void this.deleteIfStillEmpty(channelId, guild);
+      void this.withGuildLock(guild.id, () => this.deleteIfStillEmpty(channelId, guild));
     }, deletionGraceMs);
     this.#deletionTimers.set(channelId, timer);
   }
@@ -382,6 +430,7 @@ export class ManagedRoomService {
     ) {
       throw new Error("PERMITTED_USER_LIMIT_REACHED");
     }
+    this.assertAclMatchesSettings(channel, room, userId, { connect: true });
     await channel.permissionOverwrites.edit(userId, { Connect: true });
     room.settings.banned_user_ids = room.settings.banned_user_ids.filter((id) => id !== userId);
     if (!room.settings.permitted_user_ids.includes(userId))
@@ -394,6 +443,7 @@ export class ManagedRoomService {
     userId?: string
   ): Promise<void> {
     if (userId === undefined) throw new Error("USER_REQUIRED");
+    this.assertAclMatchesSettings(channel, room, userId, { connect: true });
     await channel.permissionOverwrites.edit(userId, {
       Connect: room.settings.banned_user_ids.includes(userId) ? false : null
     });
@@ -422,6 +472,7 @@ export class ManagedRoomService {
     ) {
       throw new Error("BANNED_USER_LIMIT_REACHED");
     }
+    this.assertAclMatchesSettings(channel, room, userId, { connect: true });
     await channel.permissionOverwrites.edit(userId, { Connect: false });
     room.settings.permitted_user_ids = room.settings.permitted_user_ids.filter(
       (id) => id !== userId
@@ -437,6 +488,7 @@ export class ManagedRoomService {
     userId?: string
   ): Promise<void> {
     if (userId === undefined) throw new Error("USER_REQUIRED");
+    this.assertAclMatchesSettings(channel, room, userId, { connect: true });
     await channel.permissionOverwrites.edit(userId, {
       Connect: room.settings.permitted_user_ids.includes(userId) ? true : null
     });
@@ -449,15 +501,51 @@ export class ManagedRoomService {
     claimant: GuildMember
   ): Promise<void> {
     if (channel.members.has(room.owner_user_id)) throw new Error("CURRENT_OWNER_IS_PRESENT");
+    const existing = [...this.#rooms.values()].find(
+      (candidate) =>
+        candidate.guild_id === room.guild_id &&
+        candidate.channel_id !== room.channel_id &&
+        candidate.owner_user_id === claimant.id
+    );
+    if (existing !== undefined) throw new Error("CLAIMANT_ALREADY_OWNS_A_ROOM");
     const priorOwnerId = room.owner_user_id;
-    await channel.permissionOverwrites.edit(priorOwnerId, { Connect: null });
-    await channel.permissionOverwrites.edit(claimant.id, {
-      Connect: true,
-      ViewChannel: true
-    });
+    this.assertAclMatchesSettings(channel, room, priorOwnerId, { connect: true, view: true });
+    this.assertAclMatchesSettings(channel, room, claimant.id, { connect: true, view: true });
+    const nextName = this.defaultName(claimant.displayName);
+    const claimantConnect = this.expectedConnectState(room, claimant.id);
+    const claimantView = this.expectedViewState(room, claimant.id);
+    try {
+      await channel.permissionOverwrites.edit(priorOwnerId, {
+        Connect: null,
+        ViewChannel: null
+      });
+      await channel.permissionOverwrites.edit(claimant.id, {
+        Connect: true,
+        ViewChannel: true
+      });
+      await channel.setName(nextName, `Room claimed by ${claimant.id}`);
+    } catch (error) {
+      await Promise.all([
+        channel.permissionOverwrites
+          .edit(priorOwnerId, { Connect: true, ViewChannel: true })
+          .catch(() => undefined),
+        channel.permissionOverwrites
+          .edit(claimant.id, {
+            Connect: this.permissionEditValue(claimantConnect),
+            ViewChannel: this.permissionEditValue(claimantView)
+          })
+          .catch(() => undefined)
+      ]);
+      throw error;
+    }
     room.owner_user_id = claimant.id;
-    room.settings.name = this.defaultName(claimant.displayName);
-    await channel.setName(room.settings.name, `Room claimed by ${claimant.id}`);
+    room.settings.name = nextName;
+    room.settings.permitted_user_ids = room.settings.permitted_user_ids.filter(
+      (id) => id !== claimant.id
+    );
+    room.settings.banned_user_ids = room.settings.banned_user_ids.filter(
+      (id) => id !== claimant.id
+    );
   }
 
   private async reset(channel: VoiceChannel, room: ManagedRoomRecord): Promise<void> {
@@ -468,6 +556,13 @@ export class ManagedRoomService {
       ...room.settings.banned_user_ids,
       channel.guild.roles.everyone.id
     ]);
+    for (const id of affectedIds) {
+      this.assertAclMatchesSettings(channel, room, id, { connect: true });
+    }
+    this.assertAclMatchesSettings(channel, room, room.owner_user_id, {
+      connect: true,
+      view: true
+    });
     await Promise.all(
       [...affectedIds].map((id) => channel.permissionOverwrites.edit(id, { Connect: null }))
     );
@@ -480,6 +575,66 @@ export class ManagedRoomService {
       channel.setUserLimit(0, "Reset managed-room settings")
     ]);
     room.settings = this.defaultSettings(name);
+  }
+
+  private assertAclMatchesSettings(
+    channel: VoiceChannel,
+    room: ManagedRoomRecord,
+    subjectId: string,
+    bits: { connect?: boolean; view?: boolean }
+  ): void {
+    if (
+      bits.connect &&
+      this.permissionState(channel, subjectId, PermissionFlagsBits.Connect) !==
+        this.expectedConnectState(room, subjectId)
+    ) {
+      throw new Error("ACL_CHANGED_BY_STAFF");
+    }
+    if (
+      bits.view &&
+      this.permissionState(channel, subjectId, PermissionFlagsBits.ViewChannel) !==
+        this.expectedViewState(room, subjectId)
+    ) {
+      throw new Error("ACL_CHANGED_BY_STAFF");
+    }
+  }
+
+  private expectedConnectState(
+    room: ManagedRoomRecord,
+    subjectId: string
+  ): "allow" | "deny" | "neutral" {
+    if (subjectId === room.owner_user_id) return "allow";
+    if (subjectId === room.guild_id) return room.settings.locked ? "deny" : "neutral";
+    if (room.settings.banned_user_ids.includes(subjectId)) return "deny";
+    if (room.settings.permitted_user_ids.includes(subjectId)) return "allow";
+    return "neutral";
+  }
+
+  private expectedViewState(
+    room: ManagedRoomRecord,
+    subjectId: string
+  ): "allow" | "deny" | "neutral" {
+    return subjectId === room.owner_user_id ? "allow" : "neutral";
+  }
+
+  private permissionState(
+    channel: VoiceChannel,
+    subjectId: string,
+    permission: bigint
+  ): "allow" | "deny" | "neutral" | "conflict" {
+    const overwrite = channel.permissionOverwrites.cache.get(subjectId);
+    const allowed = overwrite?.allow.has(permission) === true;
+    const denied = overwrite?.deny.has(permission) === true;
+    if (allowed && denied) return "conflict";
+    if (allowed) return "allow";
+    if (denied) return "deny";
+    return "neutral";
+  }
+
+  private permissionEditValue(state: "allow" | "deny" | "neutral"): boolean | null {
+    if (state === "allow") return true;
+    if (state === "deny") return false;
+    return null;
   }
 
   private storeConfig(config: GuildConfigRecord): void {
@@ -538,6 +693,25 @@ export class ManagedRoomService {
   private requireAdministrator(member: GuildMember): void {
     if (!member.permissions.has(PermissionFlagsBits.ManageChannels)) {
       throw new Error("MANAGE_CHANNELS_REQUIRED");
+    }
+  }
+
+  private async withGuildLock<T>(guildId: string, operation: () => Promise<T> | T): Promise<T> {
+    const previous = (this.#guildOperations.get(guildId) ?? Promise.resolve()).catch(
+      () => undefined
+    );
+    let release = (): void => undefined;
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const tail = previous.then(() => gate);
+    this.#guildOperations.set(guildId, tail);
+    await previous;
+    try {
+      return await operation();
+    } finally {
+      release();
+      if (this.#guildOperations.get(guildId) === tail) this.#guildOperations.delete(guildId);
     }
   }
 }

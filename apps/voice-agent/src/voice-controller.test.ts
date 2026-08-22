@@ -117,7 +117,7 @@ function fixture(permissionAllowed = true, daveEstablished = true) {
     onStatus: (status) => statuses.push(status)
   });
   controller.setTarget(target);
-  return { controller, send, statuses, voiceConnection };
+  return { client, controller, guild, send, statuses, voiceConnection };
 }
 
 beforeEach(() => {
@@ -348,5 +348,27 @@ describe("voice controller", () => {
       observed_state: "BLOCKED",
       last_error_code: "VOICE_CLOSE_4014"
     });
+  });
+
+  it("cancels an in-flight join after an intentional leave", async () => {
+    const { client, controller, guild } = fixture();
+    let releaseGuild = (): void => undefined;
+    const guildGate = new Promise((resolve) => {
+      releaseGuild = () => resolve(guild);
+    });
+    (client.guilds.fetch as ReturnType<typeof vi.fn>).mockReturnValue(guildGate);
+    const joining = controller.execute(command("join"));
+    await vi.waitFor(() => expect(client.guilds.fetch).toHaveBeenCalledOnce());
+    await expect(controller.execute(command("leave"))).resolves.toMatchObject({
+      accepted: true,
+      observed_state: "DISABLED"
+    });
+    releaseGuild();
+    await expect(joining).resolves.toMatchObject({
+      accepted: false,
+      result_code: "VOICE_CONNECTION_SUPERSEDED",
+      observed_state: "DISABLED"
+    });
+    expect(voiceMocks.joinVoiceChannel).not.toHaveBeenCalled();
   });
 });

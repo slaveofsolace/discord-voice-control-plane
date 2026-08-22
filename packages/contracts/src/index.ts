@@ -111,6 +111,23 @@ export const commandAckSchema = z.object({
 });
 export type CommandAck = z.infer<typeof commandAckSchema>;
 
+export const commandStartSchema = z.object({
+  type: z.literal("command_start"),
+  command_id: z.uuid(),
+  deployment_id: z.string().min(1).max(64),
+  occurred_at: z.number().int().nonnegative()
+});
+export type CommandStart = z.infer<typeof commandStartSchema>;
+
+export const commandStartAckSchema = z.object({
+  type: z.literal("command_start_ack"),
+  command_id: z.uuid(),
+  deployment_id: z.string().min(1).max(64),
+  accepted: z.boolean(),
+  duplicate: z.boolean()
+});
+export type CommandStartAck = z.infer<typeof commandStartAckSchema>;
+
 export const agentStatusSchema = z.object({
   type: z.literal("status"),
   deployment_id: z.string().min(1).max(64),
@@ -217,6 +234,7 @@ export const authorizedTargetEventSchema = z.object({
 
 export const agentMessageSchema = z.union([
   commandAckSchema,
+  commandStartSchema,
   agentStatusSchema,
   agentHeartbeatSchema,
   managedRoomEventSchema,

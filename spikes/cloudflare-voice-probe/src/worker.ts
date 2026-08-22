@@ -1,24 +1,17 @@
-import { Container, getContainer, type StopParams } from "@cloudflare/containers";
+import { Container, type StopParams } from "@cloudflare/containers";
 
 import type { ProbeReport } from "./report.js";
 
-interface Env {
-  VOICE_PROBE_CONTAINER: DurableObjectNamespace<VoiceProbeContainer>;
-  PROBE_ENABLED: string;
-  PROBE_GUILD_ID: string;
-  PROBE_VOICE_CHANNEL_ID: string;
-  PROBE_STABLE_MS: string;
-  DISCORD_BOT_TOKEN: string;
-}
+type ProbeContainerEnv = Record<string, never>;
 
-interface ProbeConfiguration {
+export interface ProbeConfiguration {
   botToken: string;
   channelId: string;
   guildId: string;
   stableMs: string;
 }
 
-interface LifecycleEvidence {
+export interface LifecycleEvidence {
   phase: string;
   first_run_id: string | null;
   second_run_id: string | null;
@@ -38,7 +31,7 @@ interface StopEvidence {
   observed_at: number;
 }
 
-export class VoiceProbeContainer extends Container<Env> {
+export class VoiceProbeContainer extends Container<ProbeContainerEnv> {
   defaultPort = 8080;
   sleepAfter = "5m";
   enableInternet = true;
@@ -176,20 +169,5 @@ export class VoiceProbeContainer extends Container<Env> {
 export default {
   fetch(): Response {
     return new Response("Not found", { status: 404 });
-  },
-  scheduled(_event: ScheduledController, env: Env, context: ExecutionContext): void {
-    const configuration: ProbeConfiguration = {
-      botToken: env.DISCORD_BOT_TOKEN,
-      channelId: env.PROBE_VOICE_CHANNEL_ID,
-      guildId: env.PROBE_GUILD_ID,
-      stableMs: env.PROBE_STABLE_MS
-    };
-    context.waitUntil(
-      getContainer(env.VOICE_PROBE_CONTAINER, "cloudflare-voice-probe")
-        .prove(env.PROBE_ENABLED === "true", configuration)
-        .then((evidence) =>
-          console.log(JSON.stringify({ event: "cloudflare_voice_probe_lifecycle", ...evidence }))
-        )
-    );
   }
-} satisfies ExportedHandler<Env>;
+} satisfies ExportedHandler;

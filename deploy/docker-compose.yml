@@ -5,7 +5,7 @@ services:
       dockerfile: Dockerfile.voice-agent
     image: discord-voice-control-plane/voice-agent:local
     env_file:
-      - voice-agent.env
+      - ${VOICE_AGENT_ENV_FILE:-voice-agent.env}
     restart: unless-stopped
     read_only: true
     tmpfs:

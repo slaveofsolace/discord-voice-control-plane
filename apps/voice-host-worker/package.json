@@ -9,6 +9,8 @@
     "clean": "node ../../scripts/clean-dist.mjs apps/voice-host-worker"
   },
   "dependencies": {
-    "@cloudflare/containers": "0.3.7"
+    "@cloudflare/containers": "0.3.7",
+    "@discord-vc-control/cloudflare-voice-probe": "workspace:*",
+    "@discord-vc-control/config": "workspace:*"
   }
 }
