@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+- Added private relay-only Voice Rooms intake with exact guild, channel, application, operator, role, and elevated-operator authorization.
+- Added exact ordinary-text and `!voice`/`!v` approval grammar, including elevated-risk classification and bot, webhook, edit, attachment, embed, thread, mention, control, and unknown-command rejection.
+- Added a separately keyed relay-ingress HMAC boundary with timestamp freshness, nonce replay protection, deterministic source-message idempotency, local-agent liveness checks, and redacted D1 metadata.
+- Replaced immediate local draft preparation with a 50-item, 30-minute encrypted per-profile approval queue and a secured `127.0.0.1` dashboard.
+- Added prepare-time OAuth identity, RPC, target, selected-voice, TTL, and state checks before fixed-path `clip.exe` preparation. The owner still performs the final paste and send; `OWNER_CONFIRMED_SENT` is not Discord delivery proof.
+- Added separate profile keys, queues, and deployment locks, plus invalidation after a target or profile authorization change.
+- Added negative-source checks proving the absence of raw user tokens, a user Gateway, automatic user-account sends, Discord UI keystrokes, PowerShell clipboard handling, synthetic audio, and scheduled keepalive behavior.
+
 - Added durable Discord interaction claims, a pre-effect execution ledger, expiring/revalidated agent sessions, fail-closed audit capacity, and keyed state reconciliation with dead-letter blocking.
 - Added a 64 KiB interaction-body limit, complete runtime environment validation, rotation-key separation checks, and minimal Container health output.
 - Serialized managed-room creation and claims, rechecked every room command against current enablement, stopped on bot-owned ACL conflicts, and cancelled stale in-flight voice joins.
@@ -24,4 +32,4 @@
 - Made relay delivery idempotent through Discord's enforced message nonce and tightened initial D1 provisioning, secret rotation, and deployment-variable handling.
 - Added a requirement-by-requirement completion audit and a sanitized current record of the Cloudflare account-selection, private Discord, and Socialize release gates.
 
-No Discord or Cloudflare live verification is claimed by this entry.
+No live Discord, OAuth, Cloudflare, Container, Socialize, delivery, retention, or anti-AFK verification is claimed by this entry.

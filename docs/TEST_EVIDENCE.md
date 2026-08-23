@@ -1,73 +1,64 @@
 # Test evidence
 
-Evidence captured here must be sanitized. Raw command output stays under ignored `.runtime/`.
+Raw execution logs remain under ignored `.runtime`. This file contains sanitized proof boundaries.
 
 ## Labels
 
 - `UNIT TESTED`: deterministic local test.
-- `INTEGRATION TESTED`: multiple real project components under a local or Workers test runtime.
-- `LIVE TEST-GUILD VERIFIED`: observed through the two official applications in `VC Control Lab`.
-- `LIVE LOCAL RPC VERIFIED`: observed through Discord's approved local RPC interface with an exact profile/user/target binding.
-- `TARGET-GUILD VERIFIED`: observed in the staff-approved target guild and window.
+- `INTEGRATION TESTED`: multiple components under the local or Workers test runtime.
+- `LIVE TEST-GUILD VERIFIED`: observed in `VC Control Lab`.
+- `LIVE LOCAL RPC VERIFIED`: observed through an exact OAuth profile/user/target binding.
+- `TARGET-GUILD VERIFIED`: observed during a staff-approved target window.
 - `UNVERIFIED`: not observed at that level.
-- `BLOCKED`: an external prerequisite or failed acceptance gate prevents completion.
-- `PREREQUISITE MET`: a required account or configuration condition was directly observed; it is not runtime proof.
+- `BLOCKED`: an external prerequisite prevents the proof.
 
-## Current checkpoint
+## Current source checkpoint
 
-| Gate                      | Result               | Evidence                                                                                                                                                                                                                                                                                  |
-| ------------------------- | -------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Frozen dependency install | `UNIT TESTED`        | `pnpm install --frozen-lockfile` passed with pnpm 11.19.0                                                                                                                                                                                                                                 |
-| Clean-build verification  | `UNIT TESTED`        | `pnpm clean && pnpm verify` passed after deleting output and TypeScript build metadata                                                                                                                                                                                                    |
-| Formatting and lint       | `UNIT TESTED`        | Prettier check and typed ESLint passed from a clean build state                                                                                                                                                                                                                           |
-| Strict TypeScript build   | `UNIT TESTED`        | Strict typecheck and all eight workspace builds passed on Node 24.19.0                                                                                                                                                                                                                    |
-| Package test suite        | `UNIT TESTED`        | 101 tests passed across 17 files, including managed-room race/ACL, stale voice-attempt, mutually exclusive host/probe, first-deploy secret-file handling, and Container rollout-mode validation                                                                                           |
-| Workers integration suite | `INTEGRATION TESTED` | 18 migration-backed Worker, Durable Object, D1, interaction replay, execution ledger, heartbeat, and fail-closed outbox tests passed                                                                                                                                                      |
-| Copy triage               | `UNIT TESTED`        | Project scanner passed across 22 files; Anti-AI scanner reported zero candidates                                                                                                                                                                                                          |
-| Secret scan               | `UNIT TESTED`        | Scan passed across 122 tracked and untracked candidate files and checks both Git and Docker exclusion of the fallback environment path                                                                                                                                                    |
-| Dependency audit          | `UNIT TESTED`        | `pnpm audit --audit-level high` reported no known vulnerabilities                                                                                                                                                                                                                         |
-| Standard security review  | `INTEGRATION TESTED` | A source-only baseline scan reported 14 findings; all 14 have current source remediations and focused regressions, followed by the complete clean verification gate                                                                                                                       |
-| Reusable Discord skill    | `UNIT TESTED`        | Canonical and installed copies validate and compare byte-for-byte                                                                                                                                                                                                                         |
-| Worker deploy bundles     | `UNIT TESTED`        | The control Worker passes a current Wrangler dry run with declared required secrets supplied through an ignored file. Voice-host bundling passed in CI; the local full dry run stops at the expected image-build stage because no Docker CLI is installed.                                |
-| GitHub Actions            | `INTEGRATION TESTED` | Published `main` commit `3780f4a` passed run `32566678045`: source verification, secret scan, dependency audit, both image builds, the control Worker bundle, and the Cloudflare probe image                                                                                              |
-| Docker image builds       | `INTEGRATION TESTED` | Both the voice-agent and Cloudflare probe images built for published `main` commit `3780f4a`; construction remains unavailable locally                                                                                                                                                    |
-| Docker/voice runtime      | `UNVERIFIED`         | No image was started on Cloudflare and no live voice transport was exercised                                                                                                                                                                                                              |
-| Computer-assisted setup   | `PARTIAL`            | Computer control created the lab server, channels, and both applications, then saved both least-privilege Guild Install profiles. VC Control is installed; Voice Rooms is staged at the final exact seven-permission confirmation. No credential or protected confirmation was automated. |
-| UI inspection incident    | `OBSERVED`           | Selecting Discord's `Open Chat` control unexpectedly joined the operator's user account to `voice-probe`; it was immediately disconnected. Discord displayed input error 3002, no message was sent, and this event is excluded from bot or voice-host evidence                            |
-| Discord application setup | `PARTIAL`            | Both applications and their install profiles exist. Discord confirmed VC Control was added to the lab. Voice Rooms awaits the owner's final staged Authorize click; Message Content and both protected credential captures follow.                                                        |
-| Cloudflare control deploy | `UNVERIFIED`         | No live Worker URL, D1 database, or Durable Object deployment                                                                                                                                                                                                                             |
-| Cloudflare Workers Paid   | `PREREQUISITE MET`   | Authenticated account UI shows Workers Paid as the current plan and Containers included; no account or billing identifiers were committed                                                                                                                                                 |
-| Cloudflare voice probe    | `UNVERIFIED`         | Billing no longer blocks deployment; no probe Container run, UDP/DAVE report, clean stop, or lifecycle restart has been observed                                                                                                                                                          |
-| Test-guild commands       | `UNVERIFIED`         | The private guild, requested channels, both applications, VC Control install, and both saved profiles exist; no credential, registered command, Gateway session, or voice session exists                                                                                                  |
-| Authorized local RPC      | `UNIT TESTED`        | IPC framing, nonce correlation, error redaction, bounded scopes, exact profile/user/guild/target binding, non-forced voice selection, unexpected-disconnect blocking, and manual-send draft receipts are covered locally. No Discord RPC approval or live session exists.                 |
-| Socialize                 | `BLOCKED`            | The official-bot install route is unavailable. Discord RPC partner/tester access, a persistent authorized desktop session, staff approval/window, confirmed IDs, operator/removal contacts, and the exact target were not supplied.                                                       |
+| Gate                               | Result               | Sanitized evidence                                                                                                                                                                                                                                                         |
+| ---------------------------------- | -------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Formatting, lint, typecheck, build | `UNIT TESTED`        | Prettier, typed ESLint, strict TypeScript, and all workspace builds passed after the relay implementation                                                                                                                                                                  |
+| Package tests                      | `UNIT TESTED`        | 163 tests across 30 files passed                                                                                                                                                                                                                                           |
+| Workers tests                      | `INTEGRATION TESTED` | 23 migration-backed Worker, Durable Object, D1, interaction, relay-ingress, replay, idempotency, offline, cancellation, and recovery tests passed                                                                                                                          |
+| Relay intake                       | `UNIT TESTED`        | Exact guild/channel/application/operator/elevated authorization; bot, webhook, edit, attachment, embed, thread, and empty-message denial                                                                                                                                   |
+| Content grammar                    | `UNIT TESTED`        | Ordinary text NFC/length/control/bidi/slash/mention checks; every `!voice` and `!v` form, boundary, alias, user argument, and risk class                                                                                                                                   |
+| Relay ingress                      | `INTEGRATION TESTED` | Separate HMAC, timestamp, nonce replay, tamper, oversized body, source-message idempotency, context revalidation, offline no-retention, and cancellation                                                                                                                   |
+| Local encrypted queue              | `UNIT TESTED`        | AES-GCM confidentiality/integrity, atomic recovery, restart, TTL, cap, FIFO, cancellation, terminal purge, profile/target invalidation                                                                                                                                     |
+| Local dashboard                    | `UNIT TESTED`        | Loopback binding, Host/Origin/session/CSRF/CSP/body limits, unauthorized mutations, lifecycle actions, and no CORS/remote assets                                                                                                                                           |
+| Prepare boundary                   | `UNIT TESTED`        | Prepare-time OAuth/account/RPC/voice/text/TTL/state revalidation and bounded fixed-path `clip.exe` success/failure/timeout                                                                                                                                                 |
+| Profile isolation                  | `UNIT TESTED`        | Separate profile key/queue, one active deployment profile, wrong-user blocking, non-overwrite authorization                                                                                                                                                                |
+| Status semantics                   | `UNIT TESTED`        | Full status lifecycle, elevated risk, human receipt semantics, and no manual-path `target_message_id`                                                                                                                                                                      |
+| Source-negative checks             | `UNIT TESTED`        | No raw user-token path, user Gateway, user-account send API, Discord UI keystroke, PowerShell clipboard, synthetic audio, scheduled activity, or keepalive path                                                                                                            |
+| Secret and dependency scans        | `UNIT TESTED`        | Secret scan passed across 156 tracked/untracked candidates; `pnpm audit --audit-level high` reported no known vulnerabilities                                                                                                                                              |
+| Copy and reasoning checks          | `UNIT TESTED`        | Project copy triage passed across 22 files, the Anti-AI scanner found zero candidates, and the Human Cortex ledger passed schema 2.0.0 validation                                                                                                                          |
+| Exact-SHA GitHub CI                | `UNVERIFIED`         | The relay completion commit has not been pushed yet                                                                                                                                                                                                                        |
+| Discord private resources          | `PARTIAL`            | The lab server, channels, and applications were observed earlier; the staged seven-permission Voice Rooms consent is obsolete and must not be approved. A new four-permission relay-only consent, Message Content, credentials, commands, and live relay remain unverified |
+| Verified `main` RPC profile        | `UNVERIFIED`         | No profile-bound OAuth/RPC identity and target proof exists in committed evidence; the earlier “auth granted” statement is insufficient                                                                                                                                    |
+| Cloudflare deployment              | `UNVERIFIED`         | Workers Paid was observed active; no current Worker, D1, Durable Object, host, or probe deployment is claimed                                                                                                                                                              |
+| Socialize                          | `BLOCKED`            | Untouched; no staff window, exact target, contacts, verified RPC profile, or supported persistence/exemption mechanism                                                                                                                                                     |
 
-## Required test-guild matrix
+The complete `pnpm verify` gate and `git diff --check` passed on 2026-08-22 before the documentation checkpoint. Publication SHA and exact-SHA CI result are recorded in the delivery closeout. Test counts do not prove live Discord, voice, OAuth, Cloudflare, or target behavior.
 
-- Every `/vc` action, wrong application/tenant/deployment/guild/channel/user/role, elevated denial, stale heartbeat, and diagnostics result.
-- Every `/voice`, `!voice`, and `!v` action with valid and invalid ownership.
-- Prefix-disabled behavior without Message Content.
-- `/voice-admin` setup idempotency, status, enable, disable, managed-guild allowlist, and exact target authorization.
-- One room per owner; owner absent/present claim; 15-second deletion with bots only; restart reconciliation; cancellation on human rejoin.
-- Staff overwrite preservation on reset and ACL subject caps before Discord edits.
-- Relay length, NFC, control/bidi, prefix, mention suppression, deterministic enforced Discord nonce, operator limit, deployment limit, redelivery, and Discord 429.
-- Duplicate, expired, wrong-key, wrong-tenant, wrong-deployment, forged, and replayed command envelopes.
-- Durable Object eviction and reconnect; D1 state/audit outbox recovery; ordered replay; 24-hour receipt behavior.
-- Gateway and voice interruption; controlled rejoin; DAVE pending/timeout; moderator move/disconnect; permission loss; target deletion; no reconnect after intentional removal.
-- Process restart, Gateway reauthentication, and clean SIGTERM.
+## Private-lab acceptance matrix
 
-## Required local RPC matrix
+- Complete the protected Voice Rooms installation and Message Content setting manually.
+- Complete a verified `main` OAuth profile manually while Discord desktop is signed into the intended account.
+- Join and leave `voice-probe` using the exact stored RPC target.
+- Queue ordinary chat, operator commands, and elevated commands.
+- Verify wrong guild, channel, application, user, role, and elevated denial.
+- Verify bots, webhooks, edits, attachments, embeds, threads, empty messages, mentions, control/bidi text, slash text, and unknown commands do not queue.
+- Verify status and cancellation do not reveal content and only the originator or elevated operator may cancel.
+- Restart the local agent and Discord desktop; confirm queue recovery and wrong-account blocking.
+- Prepare one request, manually paste/send it, mark it sent, and independently inspect Discord. Record preparation, owner confirmation, and delivery as three separate observations.
+- Exercise OAuth revocation, ingress/agent key rotation, queue recovery, emergency stop, process shutdown, and rollback.
 
-- Discord partner/tester access and explicit OAuth authorization through the local client.
-- Profile binds the authenticated user ID and refuses a different signed-in account.
-- One allowed guild plus the exact control-plane voice/text target; no command accepts an arbitrary target ID.
-- Join, leave, status, diagnostics, pause, resume, reconnect, and desktop-client restart.
-- Refuse a forced move when the user is already in another voice channel.
-- Unexpected move/disconnect blocks without automatic rejoin.
-- Relay selects the exact text channel, stages only sanitized text, reports `USER_SEND_REQUIRED`, and creates no Discord message ID.
-- OAuth refresh, revocation, profile deletion, agent-key rotation, and clean SIGINT/SIGTERM.
-- Gateway, UDP, DAVE, audio, automatic message-send, and Cloudflare-hosted-user fields remain explicitly unobserved because RPC does not expose them.
+## Cloudflare Container proof
 
-## Live probe fields
+Two different probe run IDs must each prove outbound DNS/HTTPS, Gateway WebSocket, authenticated Gateway ready, UDP discovery send/receive, Discord IP discovery, DAVE negotiation, silent stability, controlled reconnect and DAVE renegotiation, native compatibility, no inbound UDP listener dependency, and clean SIGTERM. The host must then prove lifecycle restart. Building an image is not acceptance.
 
-Both Container reports must pass the fail-closed fields for DNS, HTTPS, raw Gateway WebSocket hello, bot Gateway ready, fresh Gateway reauthentication, UDP socket creation, discovery send, discovery response, Discord IP discovery, voice ready, DAVE negotiation, DAVE renegotiation after controlled voice rejoin, pre/post-rejoin stability, native DAVE stack, no inbound UDP listener requirement or listener, no audio traffic, and SIGTERM readiness. The two run IDs must differ, both `onStop` records must show a requested SIGTERM with clean exit, and the controller must reach `LIFECYCLE_RESTART_VERIFIED`.
+## Target boundary
+
+Voice Rooms is not installed in Socialize. No project process has authorized, joined, messaged, modified, or measured a Socialize room.
+
+Staff approval, an exact window and target, operator and incident/removal contacts, and a supported persistent-room or timeout-exemption mechanism are required first. If approved passive observation later proves ordinary authorized-member presence insufficient and staff supplies no supported mechanism, record exactly:
+
+`TARGET RETENTION BLOCKED — NO SUPPORTED PERSISTENCE MECHANISM`

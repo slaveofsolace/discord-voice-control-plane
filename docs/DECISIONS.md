@@ -1,21 +1,19 @@
 # Project decisions
 
-These decisions come from the approved implementation plan. A later change requires an explicit project decision; it cannot silently weaken the safety boundary.
+These project decisions are authoritative until the owner explicitly changes them.
 
-- Repository: public MIT project `slaveofsolace/discord-voice-control-plane`; publish completed work on `main`. A temporary implementation branch may exist only long enough to preserve review history and must be deleted after a verified fast-forward.
-- Deployment shape: one tenant and one deployment for the first proof, with isolation fields retained for later hosted use.
-- Discord shape: interaction-only `VC Control` application and official `Voice Rooms` bot in `VC Control Lab`.
-- Setup ownership: the owner delegates ordinary already-authenticated Discord UI navigation and inspection to Computer control. CAPTCHA, login or MFA, credential display or copying, privileged-intent changes, and permission confirmations remain manual owner actions.
-- Public defaults: slash commands on; prefixes and managed rooms off.
-- Private proof: prefixes may be enabled only with Message Content enabled in both configuration and Discord's portal.
-- Target boundary: `/vc join` uses only the stored authorized target; third-party temporary rooms are presence-only.
-- Hosting: Cloudflare control plane is retained; Cloudflare voice hosting is accepted only after the live Container probe. Docker Compose/systemd is the fallback.
-- Billing: the user alone enables Workers Paid. No billing action is automated.
-- Discord UI: ordinary setup may be automated when already authenticated; login, MFA, CAPTCHA, security prompts, permission confirmations, and credential display or copying remain manual.
-- Socialize: staff approval and exact target IDs are required. No third-party commands, synthetic activity, or channel management.
-- Target feasibility: the user confirmed that an official bot installation is not available in Socialize. Treat that constraint as authoritative; do not keep presenting a `MANAGE_GUILD` installer as the target solution.
-- Authorized user path: the optional target adapter may use only Discord's documented local RPC interface after Discord partner/tester access and explicit OAuth authorization. It never accepts a raw user token, drives Discord UI, opens a user Gateway, sends audio, or sends a message as the user.
-- Account profiles: begin with the user's currently authorized desktop account and bind it to the authenticated user ID. A later separate Discord account uses a separately authorized local profile without code or Cloudflare changes.
-- Local draft boundary: RPC relay selects the exact authorized text channel and stages sanitized text locally. The receipt says `USER_SEND_REQUIRED`; only the user performs the final Discord send.
-- Evidence: unit, integration, live test-guild, and target-guild labels are separate. Unobserved behavior stays `UNVERIFIED` or `BLOCKED`.
-- Branch hygiene: inspect exact local and remote refs before deletion. Delete only task branches proven redundant with `main`; do not infer that an unrelated branch is stale.
+- Publish the reusable MIT repository on `main`; use focused commits and push only after all local gates pass.
+- V1 is one tenant and one deployment, with isolation fields retained for later hosted use.
+- `VC Control` is interaction-only. `Voice Rooms` is installed only in the private control server and runs relay-only for the authorized user path.
+- The OAuth-authorized Discord desktop account, not Voice Rooms, supplies target voice presence through documented local RPC.
+- Begin with a profile named `main`. A later `presence` account requires a separate file, key, queue, expected user ID, and fresh manual OAuth grant. Never overwrite or rename `main`.
+- Operators submit ordinary messages through one exact locked relay channel. Elevated commands require separate user or role allowlists and a prominent risk label.
+- The private bot queues requests but cannot make the normal account send. The owner performs the final paste and send. `OWNER_CONFIRMED_SENT` is a human receipt, not verified delivery.
+- Cloudflare verifies a separate relay-ingress HMAC and keeps only redacted relay metadata. Full pending content exists only in the encrypted local queue.
+- Public defaults are slash-command-only. Prefixes, Message Content, relay intake, and managed rooms fail closed unless explicitly configured. Relay-only mode forbids managed rooms and prefix handling.
+- No raw user token, user Gateway, automatic user-account message, Discord UI keystroke, synthetic audio, scheduled activity, or anti-AFK claim is allowed.
+- Login, MFA, CAPTCHA, credential display or copying, privileged-intent changes, permission grants, and OAuth approval remain manual owner actions.
+- User-logon startup is not installed until the private-lab acceptance matrix passes.
+- Socialize is untouched. Staff must provide an approved window, exact targets, contacts, and a supported persistent-room or timeout-exemption mechanism before any target action.
+- Source tests, private-lab behavior, Cloudflare deployment, local RPC behavior, and target-guild behavior use separate evidence labels. Unobserved behavior stays `UNVERIFIED` or `BLOCKED`.
+- Do not delete branches or perform unrelated repository cleanup during this delivery.

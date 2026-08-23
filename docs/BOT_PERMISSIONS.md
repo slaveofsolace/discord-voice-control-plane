@@ -2,61 +2,41 @@
 
 ## VC Control
 
-Install the application with `applications.commands` only. Do not add a bot user or the `bot` scope. Restrict the application and `/vc` command in the private control guild through Discord's integration settings and the Worker allowlists.
+Install with `applications.commands` only. Do not add a bot user or the `bot` scope. Restrict the application and `/vc` in the private control guild through Discord integration settings and Worker allowlists.
 
-## Voice Rooms: presence-only
+## Voice Rooms: private relay-only deployment
+
+Voice Rooms is installed only in `VC Control Lab` for the authorized user-relay deployment. Request:
 
 - View Channel
 - Connect
 - Send Messages
 - Read Message History
 
-Use this profile for an existing third-party temporary voice channel. Managed-room commands will reject that channel.
+Enable Guilds, Guild Messages, and the Message Content privileged intent only for this private instance. Set `CONTROL_RELAY_ENABLED=true` and `CONTROL_RELAY_ONLY=true`. Exact guild, channel, operator, elevated-operator, and application allowlists are mandatory.
 
-Permission integer: `1117184` (`ViewChannel | Connect | SendMessages | ReadMessageHistory`). Verify the generated Discord install URL before approval.
+Relay-only mode does not open the authenticated agent WebSocket, run managed rooms, interpret public prefix commands, or join Socialize. The OAuth-authorized desktop account supplies target voice presence.
 
-Generate a guild-locked shortcut only after staff records the exact authorized target:
+## Voice Rooms: reusable managed-room profile
 
-```text
-VOICE_ROOMS_APPLICATION_ID=<official application snowflake>
-AUTHORIZED_TARGET_GUILD_ID=<staff-approved guild snowflake>
-VOICE_INSTALL_PROFILE=presence-only
-VOICE_INSTALL_OUTPUT_NAME=voice-rooms-target.url
-pnpm install:url:voice
-```
-
-The command writes an ignored `.runtime/*.url` file with `disable_guild_select=true` and does not print either ID. The person who approves it must currently hold Discord's Manage Server (`MANAGE_GUILD`) permission or Administrator in that guild. A staff title without that effective permission is insufficient.
-
-This profile remains valid for guilds that can install the official bot. The user confirmed that Socialize cannot use this route; do not keep treating an installer as its pending solution.
-
-## Voice Rooms: managed rooms
-
-Presence-only permissions plus:
+The reusable managed-room deployment adds:
 
 - Manage Channels
 - Manage Roles
 - Move Members
 
-Permission integer: `286329872`. Verify it against the current Discord permission calculator and the application's install page before approving installation.
+Never request Administrator, Manage Guild, Kick Members, Ban Members, Manage Webhooks, Mute Members, Deafen Members, priority speaker, or speaking permissions. A human installer must independently hold Manage Server or Administrator to approve a server-installed app.
 
-Never request Administrator, Manage Guild, Kick Members, Ban Members, Manage Webhooks, Mute Members, Deafen Members, or priority/speaking permissions.
+Public defaults leave Message Content, relay intake, prefix commands, and managed rooms disabled. Slash commands and voice-state handling do not require Message Content.
 
-Those forbidden permissions refer to the bot's requested permission bitset. Discord separately requires the human installer to hold Manage Server (`MANAGE_GUILD`) or Administrator so they can approve any server-installed app. Installing the bot does not grant that human permission to the bot.
+## Authorized local RPC account
 
-The human permission used to invoke an administration command is separate from the bot installation profile. Managed-room administration requires Manage Channels. Exact target authorization requires either a configured `TARGET_APPROVER_USER_IDS` match or the invoking staff member's Manage Guild permission; this does not grant Manage Guild to the bot.
+The Windows local adapter requests no guild permission bitfield and installs no bot. It requires Discord RPC partner/tester access, explicit user OAuth for `rpc` and `identify`, an expected user ID, one allowed guild, and exact stored voice/text targets.
 
-## Gateway intents
+The adapter cannot send a guild message or inject audio. It prepares an approved draft with `clip.exe`; the owner manually pastes and sends. A future account requires a separate named profile and fresh OAuth grant.
 
-Always: Guilds and Guild Voice States.
+## Managed-room command effects
 
-Only when prefixes are explicitly enabled: Guild Messages and the Message Content privileged intent. Slash commands and voice state handling do not need Message Content.
+`kick` disconnects a member from the voice channel. `ban` denies Connect only on that managed channel and disconnects the member if present. Neither performs a guild kick or ban.
 
-## Authorized local RPC adapter
-
-The optional Windows-local adapter requests no guild permission bitfield and installs no bot. It requires Discord RPC partner/tester access plus explicit user OAuth authorization for `rpc` and `identify`, an expected user ID, one allowed guild, and the exact target stored by the control plane. It does not accept a Discord user token or use Gateway intents. It cannot send a message or inject audio; relay stages a local draft for manual send.
-
-## Room command effects
-
-`kick` performs a voice disconnect only. `ban` denies Connect on the managed channel and disconnects the member if present. Neither operation kicks or bans a guild member.
-
-`reset` edits only the Connect/View entries that this bot recorded for owner, permits, bans, and lock. Other staff overwrite subjects and unrelated permission bits are preserved.
+`reset` edits only the Connect/View bits recorded as bot-owned. It preserves unrelated staff subjects and permission bits.

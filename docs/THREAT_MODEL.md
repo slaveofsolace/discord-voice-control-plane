@@ -2,32 +2,33 @@
 
 ## Protected assets
 
-- Discord bot token, application client secrets, local RPC OAuth profiles, agent HMAC keys, and internal-status secret.
-- Control authority, exact target authorization, managed-room ownership, and tenant/deployment separation.
-- Member privacy and the absence of captured voice or stored relay content.
-- Audit integrity and recoverable control state.
+- Discord bot, application, OAuth, dashboard, ingress, and agent credentials.
+- Exact control guild, relay channel, operator, target, tenant, deployment, and RPC-user authorization.
+- Pending relay content and the absence of cloud content retention.
+- Member privacy, silent voice behavior, and the human final-send boundary.
+- Audit integrity and recoverable queue/control state.
 
 ## Main threats and controls
 
-| Threat                                       | Control                                                                                                                                                                                                                | Remaining gate                                           |
-| -------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------- |
-| Forged or replayed Discord request           | Complete runtime schema; structural signature check; 64 KiB streaming body cap; Ed25519 over the raw body before parsing; five-minute timestamp bound; durable 24-hour mutating-interaction claim                      | Workers integration tested; live Discord ping pending    |
-| Unauthorized operator                        | Fixed application, guild, channel, user, and role allowlists; separate elevated list                                                                                                                                   | Private-guild denial tests pending                       |
-| Arbitrary target join                        | `/vc join` has no target input; target is stored only by authorized administration                                                                                                                                     | Live target test pending                                 |
-| Wrong local Discord account                  | Each RPC profile records the authenticated user ID; startup authenticates through Discord RPC and fails closed on any mismatch                                                                                         | Approved RPC session pending                             |
-| User-account API or UI automation            | Local mode uses documented IPC RPC only; no raw user token, user Gateway, UI keystrokes, or send-message claim. Text relay becomes an explicit clipboard draft with `USER_SEND_REQUIRED`                               | Manual-send UX pending                                   |
-| Cross-tenant or cross-deployment access      | Tenant and deployment IDs are checked at bootstrap, command, Durable Object, heartbeat, configuration, and persistence boundaries                                                                                      | V1 is single-tenant; hosted-service review deferred      |
-| Forged, replayed, or duplicate agent command | Versioned HMAC-SHA256, distinct current/previous keys, 30-second expiry, five-minute nonce store, durable pre-effect executing ledger, and 24-hour receipts                                                            | Unit/integration tested; live rotation pending           |
-| Duplicate relay after retry                  | Bot mode uses 24-hour receipts plus Discord `nonce` with `enforce_nonce`; RPC mode stages a local draft and never claims a Discord message ID                                                                          | Discord delivery/retry observation pending               |
-| Lost D1 state or audit evidence              | State snapshots coalesce by object key; permanent conflicts dead-letter and block bootstrap; audit capacity fails new commands closed; alarms retry transient failures                                                 | Migration-backed recovery tested; live D1 outage pending |
-| Relay abuse                                  | NFC, 1,000-character cap, control and bidi rejection, prefix rejection, empty mentions, 5/operator/minute and 20/deployment/minute                                                                                     | Unit tested; Discord 429 observation pending             |
-| Guild-wide moderation                        | No Kick Members, Ban Members, Administrator, Manage Guild, or Manage Webhooks request                                                                                                                                  | Permission inspection pending                            |
-| Third-party room takeover                    | External targets stay `presence_only`; every managed-room action rechecks enablement/profile/allowlist; guild serialization enforces owner uniqueness; bot-owned ACL bits stop on staff conflict                       | Test-guild and Socialize observation pending             |
-| Secret disclosure                            | Separate control/voice Workers, one voice-token Worker boundary, protected prompts, redaction, ignored fallback env, deny-by-default Docker context, repository scanner                                                | Cloudflare binding inspection pending                    |
-| Voice surveillance                           | Self-deaf, self-mute, no receiver subscription, audio player, recording, transcription, Opus, or FFmpeg dependency                                                                                                     | Source checked; live behavior pending                    |
-| Endless or stale-target reconnect            | Connection-attempt epochs stop an in-flight stale join; moderator move/disconnect, 4014, permission loss, deletion, invalid authorization, auth failure, repeated DAVE failure, and retry exhaustion block the circuit | Unit state tests; live moderation test pending           |
-| False voice-readiness claim                  | Bot `CONNECTED` requires voice ready plus observed DAVE; RPC status marks Gateway, UDP, and DAVE as unowned/unobservable and reports only Discord's selected-channel state                                             | Live Container and RPC proofs pending                    |
+| Threat                         | Control                                                                                                                     | Remaining gate                                     |
+| ------------------------------ | --------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------- |
+| Forged Discord interaction     | Raw-body Ed25519 verification, bounded body, timestamp and exact control context checks                                     | Live Discord ping unverified                       |
+| Forged relay ingress           | Separate HMAC, constant-time verification, 30-second freshness, nonce replay storage, exact context schema                  | Live private-bot ingress unverified                |
+| Duplicate Gateway delivery     | Deterministic request ID from deployment, application, and source message plus durable idempotency                          | Live reconnect unverified                          |
+| Unauthorized operator          | Exact user/role allowlists; separate elevated user/role allowlists; originator/elevated cancel rule                         | Private-lab denial matrix unverified               |
+| Unsafe relay content           | NFC, 1,000-character cap, C0/C1 and bidi rejection, slash/unknown-command/ordinary-mention rejection, exact command grammar | Unit tested                                        |
+| Cloud content disclosure       | Offline requests rejected before retention; D1 stores only hash, length, routing metadata, state, and result                | Live D1 inspection unverified                      |
+| Queue disclosure or tamper     | Per-profile AES-256-GCM key, authenticated ciphertext, current-user storage, atomic backup recovery                         | Unit tested                                        |
+| Cross-profile retargeting      | Separate profile file/key/queue, one active profile per deployment, target/profile change cancels nonterminal requests      | Unit tested                                        |
+| Wrong Discord account          | OAuth identity and expected-user checks at startup and prepare time                                                         | Verified `main` profile pending                    |
+| Automatic user send            | No user Gateway, raw token, send-message API, paste/Enter synthesis, or UI control; fixed `clip.exe` preparation only       | Source-negative tests pass; live manual UX pending |
+| False delivery claim           | Manual path never sets `target_message_id`; `OWNER_CONFIRMED_SENT` is explicitly a human receipt                            | Independent delivery observation pending           |
+| Stale or wrong target          | Prepare rechecks profile, authorization, RPC, exact voice selection, exact text target, TTL, and state                      | Live moderation test pending                       |
+| Local web attack               | Loopback bind, exact Host/Origin, SameSite session, CSRF, CSP, no CORS/assets, bounded bodies                               | Unit tested                                        |
+| Voice surveillance or activity | No receiver, recording, transcription, audio output, synthetic mic, scheduler, or keepalive path                            | Source checked; live transport unverified          |
+| Third-party room takeover      | Socialize untouched; no bot install, managed-room adoption, third-party commands, or arbitrary target input                 | Staff approval/target blocked                      |
+| False retention claim          | No anti-AFK design; deletion behavior requires staff-approved passive observation and supported exemption evidence          | Blocked                                            |
 
 ## Excluded behavior
 
-No user token, user Gateway, self-bot, Discord UI keystrokes, automatic user-message send, CAPTCHA handling, third-party command invocation, synthetic activity, raw voice processing, arbitrary channel management, billing automation, or credential display automation is in scope.
+No user token, user Gateway, self-bot, automatic normal-user message, Discord UI keystroke, CAPTCHA handling, credential automation, third-party command invocation, synthetic activity, raw voice processing, scheduled keepalive, arbitrary target management, or billing automation is in scope.

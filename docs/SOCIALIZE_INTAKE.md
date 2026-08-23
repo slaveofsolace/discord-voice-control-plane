@@ -2,7 +2,7 @@
 
 Status: `BLOCKED`.
 
-Exact external blocker: the user confirmed that an official bot install is unavailable. The remaining documented path lacks Discord RPC partner/tester access, a persistent authorized Discord desktop session, a staff approval reference and test window, confirmed application/account/guild facts, the exact temporary voice-channel and chat IDs, operator scope, and an incident/removal contact. No target action is authorized until every applicable field is confirmed.
+Exact external blocker: Voice Rooms is private-control-only and will not be installed in Socialize. The authorized-user path still lacks a verified `main` RPC profile, a persistent authorized Discord desktop session, a staff approval reference and test window, confirmed application/account/guild facts, the exact temporary voice-channel and chat IDs, operator scope, an incident/removal contact, and a supported persistent-room or timeout-exemption mechanism. No target action is authorized until every applicable field is confirmed.
 
 Do not infer missing values from screenshots, display names, another guild, or an unconfirmed application match.
 
@@ -45,7 +45,7 @@ Do not create synthetic audio, messages, reactions, joins, or presence to test o
 - Approving staff member and role:
 - Approval reference:
 - Approved date and time window:
-- Approved `VC Control` application ID:
+- Approved private-control request source:
 - Approved local RPC application ID:
 - Approved member account user ID:
 - Approved target guild ID:
@@ -62,7 +62,7 @@ Do not create synthetic audio, messages, reactions, joins, or presence to test o
 
 ## Approved test boundary
 
-Allowed only when staff records it above: the explicitly named member account joining and leaving through Discord's approved local RPC, status, redacted diagnostics, and a local draft handoff during the approved window. The final Discord message, if approved, is pasted and sent manually by that user.
+Allowed only when staff records it above: the explicitly named member account joining and leaving through Discord's approved local RPC, status, redacted diagnostics, and an encrypted local approval request during the approved window. The owner prepares the request, then manually pastes and sends the final Discord message if approved. `OWNER_CONFIRMED_SENT` is not proof of Discord delivery.
 
 Not allowed: invoking a third-party bot; running managed-room commands; changing ownership, names, limits, or ACLs; synthetic messages, audio, reactions, joins, or presence; arbitrary target IDs; raw user tokens; user Gateway connections; Discord UI automation; automatic user-message sending; or continuing after staff moves or disconnects the account.
 
@@ -75,8 +75,10 @@ Current result: `UNVERIFIED`.
 - Authorization rechecked at:
 - Exact target rechecked at:
 - Authorized member joined at:
-- Draft staged at:
-- User manually sent at and resulting message ID, if approved:
+- Request queued at:
+- Request prepared at:
+- Owner confirmed sent at:
+- Independently observed Discord message ID, if available:
 - Staff or moderator action observed:
 - Room deleted or retained at:
 - Actual elapsed interval:

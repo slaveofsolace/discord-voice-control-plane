@@ -1,53 +1,58 @@
 # Architecture
 
-## Trust boundaries
+## Runtime boundaries
 
 ```text
-Discord /vc interaction
-        |
-        v
-Control Worker -- D1 audit/config
-        |
-        v signed HMAC envelope over authenticated WebSocket
+Private control server
+  operator message
+       |
+       v
+Voice Rooms (relay-only bot)
+       |
+       v  ingress HMAC + timestamp + nonce
+Control Worker ---- D1 redacted audit/config
+       |
+       v  signed 30-second command
 AgentSession Durable Object
-        ^
-        |
-        +-- Voice Agent in named Container -- bot Gateway + voice UDP
-        |        ^
-        |        |
-        |   Private Voice Host Worker -- bot token + Container lifecycle
-        |
-        +-- Optional Windows user RPC agent -- local Discord IPC + OAuth profile
+       |
+       v
+Windows user RPC agent ---- Discord desktop IPC/OAuth
+       |
+       +---- encrypted per-profile approval queue
+       +---- 127.0.0.1 dashboard
+       +---- exact voice/text selection
+       +---- clip.exe preparation
+                       |
+                       v
+                 owner pastes and sends
 ```
 
-VC Control is an interaction-only Discord application. Its Worker holds the Discord public key, control allowlists, command-signing key, and internal-status secret. It never receives the Voice Rooms bot token.
+`VC Control` remains an interaction-only Discord application. The Worker verifies Discord's Ed25519 signature over the raw request before parsing, then checks the application, guild, channel, user, role, and elevated allowlists. It has no bot token, user OAuth credential, or Gateway connection.
 
-Voice Host is not routed publicly. It alone reads the bot token and can pass it to the named production agent Container or the separately named probe Container. Its validated mode schema rejects starting both same-token Containers concurrently. The probe is invoked through the same private Worker boundary and has no independent secret binding. The Voice Agent opens outbound Discord Gateway, voice WebSocket, and UDP connections. It exposes only a Container-internal HTTP health endpoint containing service health and observed state, not guild or channel IDs.
+`Voice Rooms` is installed only in the private control server for this deployment. `CONTROL_RELAY_ONLY=true` prevents its Gateway process from opening an AgentSession connection, so it cannot replace the local RPC agent. It accepts only new human messages from the exact configured relay channel and forwards sanitized requests through the dedicated ingress. Managed rooms and prefix handling remain reusable code paths, but they are off in relay-only mode.
 
-The optional user RPC agent is a separate deployment, not a Container replacement for the bot. It runs beside an authenticated Discord desktop client on Windows and communicates through Discord's documented local IPC pipe. Its ignored profile holds an OAuth access/refresh token, client secret, expected user ID, application ID, redirect URI, and one allowed guild. The Cloudflare control plane receives none of those credentials. A profile can be reauthorized for a different Discord user without changing contracts or code.
+The relay ingress has its own HMAC secret. It verifies the raw body, a 30-second timestamp window, a unique nonce, tenant, deployment, application, guild, channel, source message, actor, roles, and grammar. A deterministic request ID derived from deployment, application, and source message makes Gateway reconnect delivery idempotent. The Worker checks that the authorized local RPC agent is connected before accepting content. Cloudflare stores only hash, length, source IDs, actor, status, timestamps, and result code.
 
-The RPC adapter can select the authorized voice channel, leave it, observe the selected channel, and select the authorized text channel. It cannot send a guild message through RPC and cannot observe or inject Discord's audio transport. In response to `relay`, it selects the exact authorized text channel and copies a sanitized draft to the local clipboard, returning `USER_SEND_REQUIRED`. UI keystrokes, raw user tokens, and user Gateway sessions are outside this architecture.
+`AgentSession` is one SQLite-backed Durable Object per deployment. It stores desired and observed state, signed-command replay nonces, pending/executing commands, receipts, relay metadata, heartbeats, and recovery outboxes. The signed agent command envelope retains its 30-second expiry, current/previous HMAC keys, five-minute nonce replay window, and 24-hour receipts. Content exists in transit only until the local agent accepts or rejects the command.
 
-AgentSession is one SQLite-backed Durable Object per deployment. It stores desired and observed state, Discord interaction claims, replay nonces, pending and executing commands, receipts, server-received heartbeats, and D1 audit/state reconciliation queues. The audit queue refuses new control actions at capacity. State snapshots coalesce by object key; permanent conflicts move to a visible dead-letter state that blocks agent bootstrap until a newer valid snapshot reconciles it. D1 stores deployment configuration, authorized target, managed rooms, bot-owned ACL records, receipts, and redacted audit events.
+The local agent uses Discord's documented IPC RPC and OAuth profile. It verifies the authenticated Discord user, exact guild, exact voice target, and exact text target. It never receives a raw user token and never opens a user Gateway. Discord desktop must remain signed into the expected account.
 
-## Isolation seams
+## Local approval boundary
 
-Every bootstrap, command envelope, heartbeat, and persistent record carries `tenant_id` and `deployment_id`. AgentSession rejects either mismatch before state changes. V1 configures one tenant and deployment; customer onboarding, token custody, tenant administration, quotas, billing, and a hosted console remain outside V1.
+A relay command has no immediate clipboard or Discord side effect. The agent writes it to a per-profile encrypted queue and returns `PENDING_USER_APPROVAL`. Queue content uses AES-256-GCM with a random profile key under ignored, user-only runtime storage. Atomic current, temporary, and backup files provide restart recovery. The queue holds at most 50 nonterminal requests for 30 minutes and displays them FIFO.
 
-## Command path
+The loopback dashboard binds only to `127.0.0.1`. It enforces a generated profile-bound session secret, exact Host and Origin, SameSite cookies, CSRF tokens, CSP, no CORS, no remote assets, and bounded request bodies.
 
-1. The control Worker validates its complete runtime configuration, rejects structurally invalid signature headers, reads at most 64 KiB, and verifies Discord's Ed25519 signature over the raw body before parsing.
-2. It checks application, guild, channel, user, role, and elevated allowlists.
-3. AgentSession durably claims each mutating Discord interaction ID for 24 hours, preventing a valid signed request from producing a second command after a retry or Worker restart.
-4. The Worker normalizes relay text, writes a content-free audit record or fails closed, signs a tenant/deployment-bound 30-second command, and defers the Discord response.
-5. AgentSession rejects wrong tenants or deployments, expired MACs, and replayed nonces, then queues or forwards the command.
-6. The Voice Agent completes authenticated bootstrap before processing serialized messages. It asks AgentSession to move the command into the durable executing ledger before side effects. A lost acknowledgement fails closed instead of replaying the effect after restart.
-7. The selected agent verifies the same tenant/deployment boundary, executes only the stored target, returns a receipt, and emits observed state every 15 seconds. A deployment uses one agent type. Agent sessions expire after five minutes and are closed after 45 seconds without a server-received heartbeat or when their key is retired.
-8. AgentSession retains receipts and executing records for 24 hours, updates audit result, and retries D1 audit or state writes through alarms after transient failure.
-9. Relay delivery includes a deterministic Discord nonce with enforcement so a retry cannot create a second message through Discord's create-message path.
+`Prepare in Discord` rechecks the OAuth identity, profile, target authorization, RPC connection, selected voice channel, request age, and state. It selects the exact authorized text channel and writes the bounded draft with `C:\Windows\System32\clip.exe`. It never pastes, presses Enter, drives Discord UI, or calls an undocumented send endpoint.
 
-## Managed rooms
+The owner manually pastes and sends. `OWNER_CONFIRMED_SENT` records only the owner's statement; it is not a Discord delivery receipt and never has a `target_message_id`. Terminal states purge full content.
 
-Managed-room setup requires both the deployment feature flag and an exact `MANAGED_GUILD_IDS` allowlist match. `/voice-admin setup` idempotently creates or reuses exact-name `Temporary Voice`, `Join to Create`, and `voice-control` channels. Guild-scoped serialization and persistence checks enforce one room per human owner across creation and claim races. Existing room commands recheck the deployment flag, allowlist, profile, and guild enablement. ACL changes compare the current bot-owned bits with the recorded state and stop on a same-bit staff change instead of overwriting it. A zero-human room is deleted after 15 seconds even when bots remain; a human rejoin cancels deletion. Startup reconciliation applies the same deletion grace after a process restart.
+## Profiles and targets
 
-An external Koya or other temporary room is never entered into the managed-room table. Newly authorized external guilds default to `presence_only`; member room commands and bot-owned ACL changes therefore reject that target.
+The initial profile is `main`. A future `presence` profile has a separate file, encryption key, queue, OAuth grant, and expected Discord user ID. Profiles are never renamed or overwritten. One deployment admits one active profile. A profile or target-authorization change invalidates every nonterminal request.
+
+The agent fails closed when Discord desktop is absent, RPC access is unavailable, OAuth refresh fails, the signed-in user differs, the target differs, the user is already in another voice channel, or Discord/moderation moves or disconnects the user.
+
+## Managed rooms and official-bot voice
+
+The reusable official-bot path retains managed-room setup, one room per human owner, ACL preservation, 15-second zero-human cleanup, DAVE-gated silent voice state, bounded transient recovery, and presence-only external targets. It never records, receives, transcribes, or emits audio. That path is not the Socialize target and is not installed there.

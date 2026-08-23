@@ -9,13 +9,13 @@
     "node_id": "root_node",
     "statement": "Build and privately verify an authorized Discord voice control plane while preserving guild authority, privacy, and explicit live-deployment gates.",
     "source_state": "A public seed repository exists without implementation and live Discord and Cloudflare credentials are not available to source code.",
-    "target_state": "A tested public implementation and private deployment proof exist, with Socialize either verified under staff authority or named as externally blocked.",
+    "target_state": "A tested and published private-control relay implementation exists with an encrypted local approval queue and manual final send; protected live proof remains separate and Socialize remains externally blocked.",
     "conditions": [
       "Keep live Discord credentials out of the repository.",
       "Use only official-bot APIs or Discord-approved local RPC; do not use raw user tokens, user Gateway sessions, UI keystrokes, automatic user-message sending, or synthetic activity.",
       "Do not touch the dirty SOL Tools checkout."
     ],
-    "boundary": "The new repository, the user's authorized Discord applications and test guild, the selected personal Cloudflare account, and the explicitly approved Socialize test window.",
+    "boundary": "The repository, the user's authorized private Discord applications and test guild, the selected personal Cloudflare account, and a future explicitly approved Socialize test window.",
     "objective_claim_id": "claim_objective",
     "invariant_ids": ["inv_authority"],
     "uncertainty_changes_decision": false
@@ -24,7 +24,7 @@
     "status": "PARTIAL",
     "facets": {
       "intent": {
-        "summary": "Ship a reusable official-bot control plane and managed-room bot, plus a separately gated approved local-RPC presence adapter for targets that cannot install the bot.",
+        "summary": "Ship a reusable control plane where the private Voice Rooms bot queues requests, a separately authorized local-RPC account supplies target presence, and the owner performs the final paste and send.",
         "knowledge": "KNOWN",
         "load_bearing": true,
         "claim_ids": ["claim_objective"],
@@ -52,7 +52,7 @@
         "unknown_disposition": "Container UDP, DAVE, and lifecycle behavior require live proof."
       },
       "current_state_history": {
-        "summary": "The official-bot implementation and published main remain intact. VC Control is installed and Voice Rooms consent is staged. Source now adds a bounded local RPC adapter with OAuth profiles, exact user/guild/target binding, non-forced voice selection, and manual-send draft staging; live RPC approval and behavior remain unverified.",
+        "summary": "The official-bot implementation remains reusable. Local main now adds a bounded RPC adapter, exact profile/user/guild/target binding, relay-only private intake, authenticated ingress, an encrypted local approval queue, and manual preparation; publication and all protected live behavior remain unverified.",
         "knowledge": "KNOWN",
         "load_bearing": true,
         "claim_ids": [
@@ -96,7 +96,7 @@
     "stakeholders": []
   },
   "authority": {
-    "scope": "Build, test, publish to main, and deploy the official-bot system plus the documented local-RPC adapter requested for Socialize. The owner delegated ordinary already-authenticated Discord UI navigation and inspection to Computer control; live credentials, OAuth/permission confirmations, privileged-intent changes, and target permissions remain human-reserved. The owner completed Workers Paid enrollment.",
+    "scope": "Build, test, and publish to main the private relay-only bot intake, authenticated Cloudflare ingress, encrypted local queue/dashboard, and documented local-RPC preparation path. Voice Rooms remains private-control-only; credentials, OAuth/permission confirmations, privileged-intent changes, deployment, and target permissions remain human-reserved. Workers Paid was observed active, while Socialize remains untouched.",
     "decision_owner": "Repository owner for implementation; target-guild staff for Socialize actions",
     "authorized_actions": [
       "Create and modify the isolated repository.",
@@ -212,12 +212,12 @@
     {
       "id": "claim_objective",
       "label": "MEASURED",
-      "statement": "The isolated implementation, documentation, local verification, CI construction, and main publication gates are complete; credential-gated live proof remains external.",
+      "statement": "The isolated user-relay implementation, documentation, and local tests are complete; final release gates, main publication, exact-SHA CI, and credential-gated live proof remain separate.",
       "evidence_ids": ["ev_user_plan", "ev_local_verify", "ev_completion_audit"],
       "contradiction_claim_ids": [],
       "confidence": {
         "level": "HIGH",
-        "basis": "The user-approved plan, generated source, frozen install, static gates, local tests, security scans, and deploy dry-runs support this bounded claim."
+        "basis": "The user-authorized implementation, focused checkpoints, current source, and local package and Workers tests support this bounded claim; the final release gate rerun remains explicit."
       }
     },
     {
@@ -256,7 +256,7 @@
     {
       "id": "claim_unknown",
       "label": "UNKNOWN",
-      "statement": "Both Discord applications exist and VC Control is installed; Voice Rooms permission grant, protected intents, credentials, private-guild behavior, Container UDP and DAVE lifecycle behavior, Discord RPC approval and live profile behavior, rollback, and Socialize retention remain unresolved.",
+      "statement": "Both Discord applications exist and VC Control was installed in the private lab; Voice Rooms permission grant, Message Content, credentials, private-guild behavior, a verified main RPC profile, queue/dashboard behavior, Cloudflare deployment, rollback, and Socialize retention remain unresolved.",
       "evidence_ids": [
         "ev_live_setup",
         "ev_runtime_prerequisites",
@@ -283,18 +283,18 @@
     {
       "id": "claim_vc_control_install",
       "label": "MEASURED",
-      "statement": "Discord confirmed that VC Control was authorized and added to VC Control Lab; the Voice Rooms guild install is staged at the final seven-permission confirmation.",
+      "statement": "Discord confirmed that VC Control was authorized and added to VC Control Lab; the ungranted seven-permission Voice Rooms consent is now obsolete and a four-permission relay-only consent is required.",
       "evidence_ids": ["ev_vc_control_install"],
       "contradiction_claim_ids": [],
       "confidence": {
         "level": "HIGH",
-        "basis": "The current authenticated Discord success page and current Voice Rooms permission dialog were inspected directly without exposing identifiers or credentials."
+        "basis": "The authenticated setup checkpoint was inspected without exposing identifiers or credentials; the later owner decision changes the required Voice Rooms permission profile before approval."
       }
     },
     {
       "id": "claim_official_bot_install_boundary",
       "label": "OBSERVED",
-      "statement": "The user confirmed that the official bot-install route is unavailable in Socialize. The remaining documented account-connected candidate is Discord local RPC, not a bot installer requirement.",
+      "statement": "The user made Voice Rooms private-control-only and directed the target presence path to use a separately OAuth-authorized Discord desktop account through documented local RPC; Socialize remains untouched until staff gates are met.",
       "evidence_ids": [
         "ev_target_install_decision",
         "ev_discord_install_docs",
@@ -309,7 +309,7 @@
     {
       "id": "claim_authorized_rpc_boundary",
       "label": "MEASURED",
-      "statement": "Current official Discord documentation exposes local OAuth-authorized voice and text channel selection but no send-message or microphone-injection command; the implemented adapter therefore stages a manual-send draft and marks Gateway, UDP, DAVE, and audio as unobservable.",
+      "statement": "Current official Discord documentation exposes local OAuth-authorized voice and text channel selection but no send-message or microphone-injection command; the implemented adapter therefore queues encrypted requests, prepares only after owner approval, and leaves final paste/send to the owner.",
       "evidence_ids": ["ev_discord_rpc_docs", "ev_user_rpc_regression"],
       "contradiction_claim_ids": [],
       "confidence": {
@@ -335,7 +335,7 @@
       "access": "GENERATED_CURRENT",
       "locator": "docs/TEST_EVIDENCE.md",
       "captured_at": "2026-08-22T09:13:31Z",
-      "integrity": "Sanitized summary of frozen install, formatting, lint, typecheck, eight builds, 101 package tests across 17 files, 18 Workers tests, wording, 122-file secret scan, dependency audit, skill parity, and current control/combined-host deploy-bundle checks.",
+      "integrity": "Sanitized current checkpoint: formatting, typed lint, strict typecheck, workspace builds, 163 package tests across 30 files, 23 migration-backed Workers tests, copy triage, 156-file secret scan, dependency audit, Anti-AI scan, ledger validation, and diff check passed before the documentation checkpoint.",
       "supports_claim_ids": ["claim_objective"],
       "contradicts_claim_ids": []
     },
@@ -425,7 +425,7 @@
       "access": "INSPECTED_CURRENT",
       "locator": "docs/TEST_EVIDENCE.md#current-checkpoint",
       "captured_at": "2026-08-22T14:16:58.878Z",
-      "integrity": "Sanitized authenticated Discord observation: VC Control is authorized in VC Control Lab; Voice Rooms is staged at the final exact seven-permission consent; identifiers and credentials are excluded.",
+      "integrity": "Sanitized authenticated Discord observation: VC Control is authorized in VC Control Lab; the ungranted seven-permission Voice Rooms consent is obsolete after the relay-only decision and must be replaced; identifiers and credentials are excluded.",
       "supports_claim_ids": ["claim_vc_control_install", "claim_unknown"],
       "contradicts_claim_ids": []
     },
@@ -435,7 +435,7 @@
       "access": "INSPECTED_CURRENT",
       "locator": "docs/DECISIONS.md",
       "captured_at": "2026-08-22T14:16:58.878Z",
-      "integrity": "The user explicitly rejected the official bot-install route for Socialize and directed the project to treat that target constraint as source of truth.",
+      "integrity": "The user explicitly directed Voice Rooms to remain private-control-only and the target presence path to use an OAuth-authorized desktop account, with manual final message sending.",
       "supports_claim_ids": ["claim_official_bot_install_boundary"],
       "contradicts_claim_ids": []
     },
@@ -468,7 +468,7 @@
       "access": "GENERATED_CURRENT",
       "locator": "apps/user-rpc-agent/src",
       "captured_at": "2026-08-22T14:40:10Z",
-      "integrity": "Current tests cover IPC framing and nonce correlation, OAuth scope bounds, exact profile/user/guild/target binding, non-forced voice selection, unexpected-disconnect blocking, and a USER_SEND_REQUIRED draft receipt with no Discord message ID.",
+      "integrity": "Current tests cover IPC framing, OAuth scope bounds, exact profile/user/guild/target binding, non-forced voice selection, unexpected-disconnect blocking, encrypted queue states, owner-approved preparation, and no Discord message ID for the manual path.",
       "supports_claim_ids": ["claim_authorized_rpc_boundary"],
       "contradicts_claim_ids": []
     }
@@ -602,10 +602,10 @@
   },
   "decision": {
     "iteration_choice": "ACT",
-    "recommendation": "Continue the official-bot private lab and Cloudflare proof while implementing the separate documented local-RPC adapter for Socialize. Require Discord partner/tester access and explicit OAuth, bind the expected user and allowed guild, and keep automatic user-message send and microphone activity as unsupported nonclaims.",
+    "recommendation": "Finish the local release and exact-SHA CI gates, then have the owner complete the protected main-profile OAuth grant before the private-lab queue matrix. Keep Voice Rooms private-control-only and leave Socialize untouched until its staff and persistence gates are complete.",
     "selected_action_ids": ["action_resume_ui_setup"],
     "rejected_options": [
-      "Do not begin with Socialize or a production voice connection before private-guild and hosting proof.",
+      "Do not begin with Socialize or install Voice Rooms there before the staff intake and supported persistence or timeout-exemption mechanism are complete.",
       "Do not use a raw user token, user Gateway, Discord UI keystrokes, automatic user-message send, or synthetic microphone activity."
     ],
     "decision_claim_ids": [
@@ -627,25 +627,27 @@
   "actions": [
     {
       "id": "action_resume_ui_setup",
-      "description": "Continue ordinary already-authenticated Discord portal navigation and local public-identifier capture, stopping before protected intent, credential, or permission actions.",
+      "description": "Finish source publication and exact-SHA CI, then stop for the owner to complete the protected main-profile OAuth approval before private-lab runtime testing.",
       "status": "AUTHORIZED",
       "authorization_status": "AUTHORIZED",
-      "authority_basis": "The owner explicitly delegated ordinary setup to Computer control while the installed Discord and Computer skills retain protected human actions.",
+      "authority_basis": "The owner explicitly authorized source publication while OAuth, credentials, privileged intent, and permission grants remain protected human actions.",
       "destructive": false,
       "production": false,
       "external_state_change": false,
       "irreversible": false,
-      "monitoring": "Reinspect the exact portal page after each navigation step and stop if CAPTCHA, authentication, credential, security, privacy, privileged-intent, or permission UI appears.",
+      "monitoring": "Require clean local gates and exact-SHA CI; do not treat a user statement as verified profile proof without an authenticated expected-user and exact-target observation.",
       "rollback": {
         "kind": "NONE",
-        "procedure": "No Discord state mutation is included in this bounded action.",
-        "preconditions": ["The authenticated Discord portal session remains available."],
-        "verification": "Confirm the current application and page identity before continuing.",
+        "procedure": "No Discord or Cloudflare mutation is included in the source-publication portion of this bounded action.",
+        "preconditions": [
+          "The local release gates pass and no protected external setup is attempted."
+        ],
+        "verification": "Confirm the published SHA and exact-SHA CI before requesting the owner's OAuth step.",
         "evidence_ids": [],
         "irreversible_residue": "None."
       },
       "recovery": {
-        "procedure": "Refresh the application list and reselect the single returned Discord Developer Portal window if the UI binding becomes stale.",
+        "procedure": "Resume from the clean published SHA; the owner may repeat the non-overwriting main-profile authorization if no verified profile exists.",
         "owner": "Repository owner and authorized operator",
         "evidence_ids": []
       },
@@ -707,7 +709,7 @@
   "verification": {
     "mechanism": {
       "status": "PASS",
-      "signal": "Signed envelopes, replay, migration-backed Durable Object state, relay limits, managed rooms, voice state transitions, and agent WebSocket behavior pass local tests.",
+      "signal": "Signed envelopes, private intake, ingress replay/idempotency, redacted D1 state, encrypted queue recovery, dashboard security, profile isolation, managed rooms, voice state transitions, and agent WebSocket behavior pass local tests.",
       "evidence_ids": [
         "ev_local_verify",
         "ev_target_approver_regression",
@@ -723,7 +725,7 @@
     },
     "guardrails": {
       "status": "PASS",
-      "signal": "Authorization, least privilege, secret scanning, copy triage, relay suppression, redaction, and protected-root boundaries pass their recorded checks.",
+      "signal": "Authorization, least privilege, relay grammar, manual-send semantics, cloud redaction, protected-profile boundaries, negative-source tests, copy triage, secret scan, dependency audit, and ledger validation pass.",
       "evidence_ids": [
         "ev_user_plan",
         "ev_local_verify",
@@ -741,10 +743,11 @@
   },
   "closure": {
     "status": "OPEN",
-    "summary": "The published official-bot implementation, private server/channels, both Discord application identities, and VC Control install remain intact. A unit-tested local RPC adapter is now in the working tree. Voice Rooms consent, protected credentials, Discord RPC approval/live authorization, Cloudflare deployment, private-guild proof, rollback, and Socialize evidence remain blocked or unverified.",
+    "summary": "The private relay intake, authenticated ingress, encrypted local queue/dashboard, RPC preparation, profile isolation, and manual final-send boundary are locally tested. Final publication/CI, Voice Rooms consent, protected credentials, a verified main RPC profile, Cloudflare deployment, private-lab proof, rollback, and Socialize evidence remain pending, blocked, or unverified.",
     "residual_risks": [
       "Cloudflare Containers may fail a live UDP, DAVE, native-library, or lifecycle gate.",
-      "Discord may not grant RPC partner/tester access, the local desktop may not be a viable persistent host, or Socialize may not provide a supported retention mechanism."
+      "Discord may not grant RPC partner/tester access, the local desktop may not be a viable persistent host, or Socialize may not provide a supported persistence or timeout-exemption mechanism.",
+      "Owner confirmation cannot independently prove that Discord received a manually sent message."
     ],
     "human_acceptance_required": false,
     "accepted_by": "",
@@ -752,7 +755,8 @@
     "nonclaims": [
       "This ledger does not contain hidden chain-of-thought.",
       "This ledger does not guarantee correctness or completeness.",
-      "This ledger does not grant human acceptance."
+      "This ledger does not grant human acceptance.",
+      "This ledger does not claim automatic user-account messaging, synthetic audio, scheduled activity, anti-AFK behavior, or Socialize access."
     ]
   }
 }

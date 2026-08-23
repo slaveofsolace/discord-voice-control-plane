@@ -1,88 +1,80 @@
 # Final evidence report
 
-## 1. Repository State
+## 1. Repository state
 
-- Public MIT repository: <https://github.com/slaveofsolace/discord-voice-control-plane>
-- Authoritative branch: `main`
-- Pull request #1 retains the initial review history. Its temporary source branch was fast-forwarded into `main` and removed after verification.
-- The current handoff has a clean working tree, `main` tracking `origin/main`, no other remote branches, and a successful main-branch CI run.
-- Source, migrations, ID-free Wrangler configuration, Dockerfiles, local examples, deployment and rollback scripts, CI, security checks, operator documentation, and the reusable Discord operations skill are included.
+- Repository: <https://github.com/slaveofsolace/discord-voice-control-plane>
+- Root: `C:\AI Projects\discord-voice-control-plane`
+- Branch: `main`
+- Recovery evidence: external patch, untracked-file hash manifest, and repository-state record under `C:\AI Projects\.codex-recovery\discord-voice-control-plane-20260822-182407`
+- Reviewable implementation checkpoints: `db74bed` for the inherited Discord RPC adapter and `bfe8824` for private relay intake, authenticated ingress, encrypted queue, and dashboard
 
-Repository publication is complete. Publication does not upgrade any live Discord, Cloudflare, or target-guild claim.
+Publication SHA, final dirty state, and exact-SHA CI result belong in the delivery closeout because a commit cannot truthfully contain its own final SHA.
 
-## 2. Research Conclusions
+## 2. Product model
 
-- Discord application commands can be installed without a bot user, so `VC Control` remains an interaction-only app with no bot token or Gateway session.
-- `Voice Rooms` must be an official bot because voice presence, member prefix commands, and managed-room state require Gateway events and Discord REST operations.
-- Message Content is required only when a deployment explicitly enables `!voice` and `!v`; the public template leaves both related flags off.
-- A successful Container image build or HTTP health check does not establish Discord voice compatibility. DNS, HTTPS, Gateway, UDP discovery, DAVE, silent stability, recovery, native compatibility, clean termination, and lifecycle restart require a live probe.
-- Normal official-bot presence is not assumed to preserve a third-party temporary room. That behavior must be measured during a staff-approved window without synthetic activity.
-- The user confirmed that Socialize cannot use the official bot-install route. The optional target adapter is limited to Discord-approved local RPC with explicit OAuth and an expected-user profile. It has no raw user-token, user-Gateway, UI-keystroke, automatic-message, or microphone-injection mode.
+`Voice Rooms` is private-control-only for this deployment. It accepts messages from one locked channel and exact operator allowlists. It is not installed in Socialize.
 
-## 3. Architecture Decision
+The OAuth-authorized Discord desktop account supplies target voice presence through documented local RPC. The private bot queues requests but cannot make the normal account send. The owner performs the final paste and send.
 
-Cloudflare hosts the signed interaction endpoint, D1 configuration and audit records, the SQLite-backed `AgentSession` Durable Object, and the private voice-host controller. The official voice bot runs as one isolated Container agent per deployment. An optional separate deployment can run a profile-bound agent beside Discord desktop on Windows and use the same signed control path through documented local RPC.
+`OWNER_CONFIRMED_SENT` is a human receipt. It does not prove Discord delivery and has no `target_message_id`.
 
-Cloudflare Container hosting is accepted only if the dedicated probe passes every fail-closed field twice with different run IDs and clean SIGTERM evidence. If UDP, DAVE, native compatibility, restart, or lifecycle behavior fails, the Cloudflare control plane remains in place and the same voice-agent image moves to the Docker Compose/systemd adapter on an authorized conventional host. See `ADR-001-voice-agent-hosting.md`.
+## 3. Architecture
 
-## 4. Implemented Changes
+The private bot signs relay ingress with a separate HMAC. The control Worker revalidates timestamp, nonce, tenant, deployment, application, guild, channel, source message, actor, roles, and content grammar. Deterministic source-message idempotency prevents duplicates after Gateway reconnects.
 
-- `/vc status|join|leave|reconnect|pause|resume|relay|diagnostics|audit` with normal and elevated operator allowlists.
-- `/voice` plus opt-in `!voice` and `!v` implementations for all twelve member commands.
-- `/voice-admin setup|status|enable|disable|authorize-target` with idempotent guild setup and exact target authorization.
-- One managed room per human owner, 15-second zero-human cleanup even when bots remain, restart reconciliation, claim rules, and preservation of unrelated permission overwrites.
-- Presence-only behavior for external temporary rooms; managed-room commands and ACL ownership do not cross that boundary.
-- Versioned HMAC envelopes, signed WebSocket challenge, replay cache, idempotency receipts, heartbeats, circuit breaker, and ordered recovery outboxes.
-- A DAVE-gated voice state machine with bounded retry, controlled rejoin, moderator-removal blocking, self-mute/self-deaf, and no audio receive or send path.
-- A private Container host that controls separately named production and probe Containers under one bot-token boundary, plus a conventional-host fallback.
-- A Windows-local Discord RPC adapter with bounded IPC framing, OAuth code exchange/refresh, exact user/guild/target binding, non-forced voice selection, fail-closed disconnect handling, and manual-send draft staging.
+The Worker accepts content only while the authorized local RPC agent is connected. Cloudflare stores hash, length, actor/source IDs, status, timestamps, and result code, never the body. The existing 30-second signed agent envelope transports content to the local agent.
 
-## 5. Security Controls
+The local agent stores accepted content in a per-profile AES-256-GCM queue. Its secured loopback dashboard controls preparation and terminal status. Preparation rechecks OAuth identity, RPC, exact voice/text targets, TTL, and state before selecting the exact text channel and invoking fixed-path `clip.exe`.
 
-- Discord Ed25519 verification runs against the raw request before JSON parsing or command dispatch.
-- Application, tenant, deployment, guild, channel, user, role, elevated-user, elevated-role, exact-target, and managed-guild checks fail closed.
-- Agent envelopes expire after 30 seconds, nonces remain replay-protected for five minutes, and receipts remain idempotent for 24 hours across current/previous key rotation.
-- Discord relay uses NFC normalization, a 1,000-character limit, C0/C1 and bidi rejection, command-prefix rejection, empty mention parsing, two rate-limit scopes, and an enforced deterministic message nonce. Audits retain metadata rather than relay text.
-- The presence-only profile requests only View Channel, Connect, Send Messages, and Read Message History. Managed rooms additionally request Manage Channels, Manage Roles, and Move Members. Neither profile requests Administrator, Manage Guild, Kick Members, Ban Members, or Manage Webhooks.
-- The control Worker cannot read the Voice Rooms bot token. Logs and committed evidence exclude secrets, relay content, and unnecessary account identifiers.
-- Local RPC profiles are ignored and restricted to the current OS user. The adapter accepts only official OAuth tokens, never a raw Discord user token, and reports Gateway, UDP, DAVE, and audio state as unowned or unobservable.
+## 4. Implemented controls
 
-## 6. Verification Evidence
+- Exact private relay guild, channel, application, operator, role, and elevated allowlists.
+- Bot, webhook, edit, attachment, embed, thread, empty-message, and wrong-context denial.
+- NFC-normalized ordinary text and exact `!voice`/`!v` grammar with elevated risk classification.
+- Separate ingress secret, freshness, nonce replay protection, constant-time verification, body cap, and durable idempotency.
+- Offline rejection without cloud body retention.
+- Queue cap 50, TTL 30 minutes, FIFO display, authenticated encryption, atomic backup recovery, restart persistence, terminal content purge, and target/profile invalidation.
+- Loopback-only dashboard with exact Host/Origin, SameSite session, CSRF, CSP, no CORS/remote assets, and bounded bodies.
+- Profile-bound dashboard secret, separate named profiles/keys/queues, and one active profile per deployment.
+- Status and cancellation controls that reveal no content; only originator/elevated cancellation.
+- Source-negative tests for forbidden user-token, Gateway, send, keystroke, audio, scheduler, and keepalive paths.
 
-- `UNIT TESTED`: clean `pnpm verify` passed formatting, typed lint, strict typecheck, all eight workspace builds, and 101 package tests across 17 files.
-- `INTEGRATION TESTED`: 18 migration-backed Workers, Durable Object, D1, interaction-replay, execution-ledger, heartbeat, outbox, restart, authorization, and configuration tests passed.
-- `UNIT TESTED`: copy triage passed across 22 files; secret scanning passed across 122 candidate files; the high-severity dependency audit reported no known vulnerabilities.
-- `INTEGRATION TESTED`: a standard source-only security review reported 14 findings against the prior revision. The current source remediates all 14 and passes focused regressions plus the complete clean gate; live Discord and Cloudflare behavior remains separately unverified.
-- `UNIT TESTED`: the current control and combined voice-host/probe bundles passed Wrangler dry-runs. Container rollout was disabled for the host dry-run because Docker is unavailable on this machine.
-- `INTEGRATION TESTED`: published `main` commit `3780f4a` passed run `32566678045`, including the complete repository, both Docker image-construction gates, and the control Worker bundle.
-- `UNIT TESTED`: the canonical and installed `authorized-discord-bot-ops` skill copies validate and match byte-for-byte.
-- `UNVERIFIED`: the private test server and requested channels are observed, but no live Discord application, command, voice transport, Cloudflare Container, or target-guild behavior is counted by these results.
+## 5. Verification evidence
 
-## 7. Deployment State
+Local verification currently records 163 package tests across 30 files and 23 migration-backed Workers tests. Coverage includes authorization, grammar, risk, HMAC/timestamp/replay/tamper/idempotency, offline privacy, D1 redaction, queue encryption/recovery/TTL/cap/FIFO/cancellation, dashboard security, prepare-time revalidation, fixed `clip.exe` behavior, lifecycle status, profile isolation, wrong-user blocking, and forbidden-source checks.
 
-Workers Paid is active on the selected test account. The control Worker, D1 database, Durable Object, private voice host, and probe are not deployed. No live URL, production database ID, Container revision, probe report, or rollback exercise exists.
+Formatting, typed lint, strict typecheck, all workspace builds, 163 package tests, 23 Workers tests, the 156-file secret scan, dependency audit, 22-file copy triage, Anti-AI scan, Human Cortex schema validation, and diff check passed before the documentation checkpoint. The immutable-range security result and exact-SHA CI URL are reported outside this commit.
 
-Cloudflare voice deployment is `UNVERIFIED`, not billing-blocked. Authenticated account UI shows Workers Paid as the current plan and Containers included. No Worker, D1 database, Durable Object, or Container has been deployed, and no account ID or billing detail is committed.
+These tests do not prove live Discord, OAuth, voice, Cloudflare, Container, or Socialize behavior.
 
-The private `VC Control Lab` server, `voice-control`, and `voice-probe` exist and were observed in authenticated live UI. `VC Control` and `Voice Rooms` exist; Discord confirmed the VC Control lab install, while Voice Rooms is staged at the final exact seven-permission consent. Their public identifiers are stored only in an ignored local runtime file, and no credential was opened or copied. Every command, Gateway, voice, intent, and credential path remains `UNVERIFIED`. Login, MFA, CAPTCHA, credential display, token copying, security prompts, privileged-intent changes, and permission confirmations retain their protected boundaries. The owner completed the Cloudflare payment step; authenticated UI shows Workers Paid as the current plan.
+## 6. Private resource state
 
-During channel-ID inspection, Discord's `Open Chat` control unexpectedly joined the operator's user account to `voice-probe`. It was immediately disconnected; Discord displayed input error 3002 and no message was sent. This event is an operational incident, not bot, Gateway, UDP, DAVE, or hosting verification.
+The private `VC Control Lab` server, `voice-control`, `voice-probe`, `VC Control`, and `Voice Rooms` were observed in an earlier authenticated setup checkpoint. `VC Control` was installed. An earlier seven-permission Voice Rooms consent was staged but never granted; it is obsolete for relay-only mode and must not be approved. Generate a new four-permission private relay consent instead.
 
-## 8. Target-Guild State
+The final Voice Rooms consent, Message Content toggle, protected credentials, command registration, live relay, and permission-denial matrix remain `UNVERIFIED`. No credential value appears in source or this report.
 
-Socialize is `BLOCKED`. The user confirmed that the official-bot install route is unavailable. Discord RPC partner/tester access, an authorized persistent local desktop session, a staff approval reference and window, confirmed application/account/guild facts, exact temporary voice/chat IDs, operator scope, and incident/removal contacts have not been supplied. No target was authorized, joined, drafted to, modified, or measured.
+## 7. RPC and local queue state
 
-Presence-only behavior and deletion timing are `UNVERIFIED`. The terminal retention phrase is used only after a live approved observation proves normal authorized-member presence insufficient and staff confirms that no supported persistent or exempt configuration exists.
+The RPC transport, OAuth storage/refresh, exact profile/user/guild/target checks, profile lock, encrypted queue, dashboard, and preparation path are source-tested.
 
-## 9. Rollback
+No verified `main` profile proof exists in committed evidence. The earlier owner message “auth granted” did not establish a profile-bound authenticated user and exact target. The protected profile directory was not read for this report.
 
-The runbook covers Worker version rollback, Container image revision rollback, command disablement, emergency disconnect, application removal, bot-token rotation, current/previous agent-key rotation, audit purge, and compensating D1 migrations. D1 point-in-time recovery is reserved for an explicitly authorized incident because it can discard later records.
+The queue URL, dashboard session, RPC join/leave, restart recovery against a real profile, clipboard preparation, manual paste/send, owner confirmation, and independent Discord delivery remain `UNVERIFIED`. User-logon startup is intentionally not installed before private-lab acceptance.
 
-The conventional-host fallback uses the same voice-agent image and authenticated control path. It does not weaken target authorization, voice privacy, relay filtering, or state-machine boundaries.
+## 8. Cloudflare and target state
 
-## 10. Remaining Work
+Workers Paid was observed as active. No current control Worker, D1 database, Durable Object, private voice host, Container probe, live URL, image revision, or rollback exercise is claimed.
 
-1. Authorize the staged Voice Rooms install, then complete Message Content and protected credential steps, register commands, and run the live private-guild command matrix in `VC Control Lab`.
-2. Deploy the control plane, run two fail-closed Container probe cycles, capture clean SIGTERM and distinct-run evidence, then choose Cloudflare or the documented conventional host from the result.
-3. Obtain Discord RPC partner/tester access and prove the profile-bound local adapter. Socialize staff then completes `SOCIALIZE_INTAKE.md`; during the approved window, test only the named member's presence controls and optional manual-send draft handoff, then observe deletion without synthetic activity.
-4. Exercise rollback and credential rotation in the private environment. Until those actions occur, the corresponding labels remain `UNVERIFIED` or `BLOCKED`.
+Socialize is untouched and `BLOCKED`. No project bot was installed, and no target was authorized, joined, messaged, modified, or measured. Staff must supply an approved window, exact voice/text targets, named account/operators, incident/removal contacts, and a supported persistent-room or timeout-exemption mechanism.
+
+There is no retention or anti-AFK claim. If approved passive observation later proves ordinary authorized-member presence insufficient and staff provides no supported configuration, record `TARGET RETENTION BLOCKED — NO SUPPORTED PERSISTENCE MECHANISM`.
+
+## 9. Rollback and recovery
+
+The runbook covers relay disablement, emergency disconnect, OAuth revocation, named-profile isolation, queue integrity recovery, Worker version rollback, Container revision rollback, D1 compensating migrations/PITR, bot and application removal, ingress/agent/dashboard key rotation, audit purge, and local shutdown.
+
+The external recovery patch and hash manifest preserve the inherited dirty checkpoint independently of Git. Startup remains an interactive-user concern after private-lab acceptance because Discord desktop RPC is required.
+
+## 10. Next live action
+
+While Discord desktop is signed into the intended account, complete the protected OAuth flow for profile `main` with `pnpm user-rpc:authorize`. Do not paste credentials into chat. A valid next checkpoint is a profile-bound RPC authentication showing the expected user and exact private-lab target; only then run the private-lab queue and manual-send matrix.
