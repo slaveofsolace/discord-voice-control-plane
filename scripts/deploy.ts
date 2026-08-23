@@ -1,6 +1,11 @@
 import { spawn } from "node:child_process";
 
-import { containerRolloutArguments, deploymentSecretsArguments } from "./deploy-options.js";
+import {
+  containerRolloutArguments,
+  controlDeploymentVariableArguments,
+  deploymentSecretsArguments,
+  voiceHostDeploymentVariableArguments
+} from "./deploy-options.js";
 
 const service = process.argv[2];
 if (!new Set(["control", "voice-host"]).has(service ?? "")) {
@@ -24,39 +29,9 @@ function run(arguments_: string[]): Promise<void> {
   });
 }
 
-function variable(name: string, fallback?: string): string {
-  const value = process.env[name] ?? fallback;
-  if (value === undefined) throw new Error(`MISSING_${name}`);
-  return `${name}:${value}`;
-}
-
-function booleanVariable(name: string, fallback = "false"): string {
-  const value = process.env[name] ?? fallback;
-  if (value !== "true" && value !== "false") throw new Error(`INVALID_${name}`);
-  return `${name}:${value}`;
-}
-
-function optionalVariable(name: string): string[] {
-  const value = process.env[name]?.trim();
-  return value ? ["--var", `${name}:${value}`] : [];
-}
-
 if (service === "control") {
   const config = "apps/control-worker/wrangler.jsonc";
-  const vars = [
-    variable("DEPLOYMENT_ID"),
-    variable("TENANT_ID"),
-    variable("CONTROL_DISCORD_APPLICATION_ID"),
-    variable("CONTROL_DISCORD_PUBLIC_KEY"),
-    variable("CONTROL_GUILD_ID"),
-    variable("CONTROL_CHANNEL_IDS"),
-    variable("CONTROL_OPERATOR_USER_IDS"),
-    variable("CONTROL_OPERATOR_ROLE_IDS", ""),
-    variable("CONTROL_ELEVATED_USER_IDS"),
-    variable("CONTROL_ELEVATED_ROLE_IDS", ""),
-    variable("AGENT_KEY_ID")
-  ].flatMap((value) => ["--var", value]);
-  vars.push(...optionalVariable("AGENT_PREVIOUS_KEY_ID"));
+  const vars = controlDeploymentVariableArguments(process.env);
   const deploy = () =>
     run(["deploy", "--config", config, ...deploymentSecretsArguments(process.env), ...vars]);
   const migrate = () => run(["d1", "migrations", "apply", "DB", "--remote", "--config", config]);
@@ -69,26 +44,7 @@ if (service === "control") {
     await deploy();
   }
 } else {
-  const hostEnabled = process.env.HOST_ENABLED === "true";
-  const probeEnabled = process.env.PROBE_ENABLED === "true";
-  if (hostEnabled && probeEnabled) throw new Error("HOST_AND_PROBE_CANNOT_RUN_CONCURRENTLY");
-  const vars = [
-    variable("DEPLOYMENT_ID"),
-    variable("TENANT_ID"),
-    booleanVariable("HOST_ENABLED"),
-    booleanVariable("PREFIX_COMMANDS_ENABLED"),
-    booleanVariable("MESSAGE_CONTENT_INTENT_ENABLED"),
-    booleanVariable("MANAGED_ROOMS_ENABLED"),
-    variable("MANAGED_GUILD_IDS", ""),
-    variable("TARGET_APPROVER_USER_IDS", ""),
-    variable("AGENT_KEY_ID"),
-    variable("CONTROL_AGENT_WS_URL"),
-    booleanVariable("PROBE_ENABLED"),
-    variable("PROBE_GUILD_ID", probeEnabled ? undefined : ""),
-    variable("PROBE_VOICE_CHANNEL_ID", probeEnabled ? undefined : ""),
-    variable("PROBE_STABLE_MS", "60000")
-  ].flatMap((value) => ["--var", value]);
-  vars.push(...optionalVariable("AGENT_PREVIOUS_KEY_ID"));
+  const vars = voiceHostDeploymentVariableArguments(process.env);
   await run([
     "deploy",
     "--config",
