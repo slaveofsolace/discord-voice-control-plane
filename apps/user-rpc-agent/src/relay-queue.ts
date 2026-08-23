@@ -305,7 +305,16 @@ export class EncryptedRelayQueue {
     ]).toString("utf8");
     const input = JSON.parse(plaintext) as unknown;
     if (!Array.isArray(input)) throw new Error("RELAY_QUEUE_STATE_INVALID");
-    return input.map((item) => relayRequestSchema.parse(item));
+    return input.map((item) => {
+      const request = relayRequestSchema.parse(item);
+      if (request.profile_name !== this.options.profileName) {
+        throw new Error("RELAY_PROFILE_MISMATCH");
+      }
+      if (request.deployment_id !== this.options.deploymentId) {
+        throw new Error("RELAY_DEPLOYMENT_MISMATCH");
+      }
+      return request;
+    });
   }
 
   private encrypt(): string {

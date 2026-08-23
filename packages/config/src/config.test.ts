@@ -66,6 +66,9 @@ describe("voice environment", () => {
     expect(
       voiceEnvironmentSchema.parse({
         ...relay,
+        AGENT_ENDPOINT: "",
+        AGENT_AUTH_SECRET: "",
+        AGENT_KEY_ID: "",
         MESSAGE_CONTENT_INTENT_ENABLED: "true",
         CONTROL_RELAY_ONLY: "true"
       })
@@ -73,6 +76,16 @@ describe("voice environment", () => {
     expect(() =>
       voiceEnvironmentSchema.parse({
         ...relay,
+        MESSAGE_CONTENT_INTENT_ENABLED: "true",
+        CONTROL_RELAY_ONLY: "true"
+      })
+    ).toThrow("forbids agent credentials");
+    expect(() =>
+      voiceEnvironmentSchema.parse({
+        ...relay,
+        AGENT_ENDPOINT: "",
+        AGENT_AUTH_SECRET: "",
+        AGENT_KEY_ID: "",
         MESSAGE_CONTENT_INTENT_ENABLED: "true",
         CONTROL_RELAY_ONLY: "true",
         PREFIX_COMMANDS_ENABLED: "true"

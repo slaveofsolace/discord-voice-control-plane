@@ -337,29 +337,69 @@ describe("control worker", () => {
       })
     );
     expect(denied.status).toBe(403);
-    const status = await relayFetch(
-      relayBody({
-        operation: "status",
-        request_id: createdResult.request_id,
-        source_message_id: "100000000000000194",
-        content: undefined
-      })
+    const statusBody = relayBody({
+      operation: "status",
+      request_id: createdResult.request_id,
+      source_message_id: "100000000000000194",
+      content: undefined
+    });
+    const statusNonce = `${crypto.randomUUID()}${crypto.randomUUID()}`;
+    const statusRaw = JSON.stringify(statusBody);
+    const statusTimestamp = Date.now();
+    const statusSignature = await signRelayIngress(
+      { nonce: statusNonce, rawBody: statusRaw, timestamp: statusTimestamp },
+      relaySecret
     );
+    const status = await relayFetch(statusBody, {
+      nonce: statusNonce,
+      rawBody: statusRaw,
+      signature: statusSignature,
+      timestamp: statusTimestamp
+    });
     const statusText = await status.text();
     expect(statusText).toContain("PENDING_USER_APPROVAL");
     expect(statusText).not.toContain("ordinary relay content");
-    const cancelled = await relayFetch(
-      relayBody({
-        operation: "cancel",
-        request_id: createdResult.request_id,
-        source_message_id: "100000000000000195",
-        content: undefined
-      })
+    const replayedStatus = await relayFetch(statusBody, {
+      nonce: statusNonce,
+      rawBody: statusRaw,
+      signature: statusSignature,
+      timestamp: statusTimestamp
+    });
+    await expect(replayedStatus.json()).resolves.toMatchObject({
+      result_code: "RELAY_NONCE_REPLAY"
+    });
+    const cancelBody = relayBody({
+      operation: "cancel",
+      request_id: createdResult.request_id,
+      source_message_id: "100000000000000195",
+      content: undefined
+    });
+    const cancelNonce = `${crypto.randomUUID()}${crypto.randomUUID()}`;
+    const cancelRaw = JSON.stringify(cancelBody);
+    const cancelTimestamp = Date.now();
+    const cancelSignature = await signRelayIngress(
+      { nonce: cancelNonce, rawBody: cancelRaw, timestamp: cancelTimestamp },
+      relaySecret
     );
+    const cancelled = await relayFetch(cancelBody, {
+      nonce: cancelNonce,
+      rawBody: cancelRaw,
+      signature: cancelSignature,
+      timestamp: cancelTimestamp
+    });
     await expect(cancelled.json()).resolves.toMatchObject({
       accepted: true,
       status: "CANCELLED",
       result_code: "REQUEST_CANCELLED"
+    });
+    const replayedCancel = await relayFetch(cancelBody, {
+      nonce: cancelNonce,
+      rawBody: cancelRaw,
+      signature: cancelSignature,
+      timestamp: cancelTimestamp
+    });
+    await expect(replayedCancel.json()).resolves.toMatchObject({
+      result_code: "RELAY_NONCE_REPLAY"
     });
     socket.close();
   });
@@ -520,8 +560,8 @@ describe("control worker", () => {
         control_channel_id: "100000000000000003",
         deployment_id: env.DEPLOYMENT_ID,
         tenant_id: env.TENANT_ID,
-        action: "reconnect",
-        payload: {},
+        action: "relay",
+        payload: { text: "execution-ledger-secret-sentinel" },
         kid: env.AGENT_KEY_ID
       },
       env.AGENT_AUTH_SECRET
@@ -558,6 +598,14 @@ describe("control worker", () => {
         )
         .one();
       expect(counts).toEqual({ pending: 0, executing: 1 });
+      const execution = state.storage.sql
+        .exec<{ envelope_json: string }>(
+          "SELECT envelope_json FROM executing_commands WHERE command_id = ?",
+          envelope.command_id
+        )
+        .one();
+      expect(JSON.parse(execution.envelope_json)).toEqual({ action: "relay" });
+      expect(execution.envelope_json).not.toContain("execution-ledger-secret-sentinel");
     });
     clientSocket.close();
     await abortAllDurableObjects();
@@ -890,7 +938,30 @@ describe("control worker", () => {
           (command_id, deployment_id, action, accepted, result_code, summary,
            observed_state, occurred_at, expires_at)
          VALUES (?, ?, 'status', 1, 'OK', 'expired', 'CONNECTED', ?, ?)`
-      ).bind(crypto.randomUUID(), deployment, now - 1, now - 1)
+      ).bind(crypto.randomUUID(), deployment, now - 1, now - 1),
+      env.DB.prepare(
+        `INSERT INTO relay_requests
+          (request_id, deployment_id, tenant_id, application_id, source_message_id,
+           actor_user_id, control_guild_id, control_channel_id, content_hash,
+           content_length, content_kind, risk, status, result_code, occurred_at,
+           updated_at, expires_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'ordinary_chat', 'OPERATOR',
+                 'CANCELLED', 'REQUEST_CANCELLED', ?, ?, ?)`
+      ).bind(
+        crypto.randomUUID(),
+        deployment,
+        env.TENANT_ID,
+        "100000000000000001",
+        "100000000000000099",
+        "100000000000000004",
+        env.CONTROL_GUILD_ID,
+        "100000000000000003",
+        "a".repeat(64),
+        10,
+        now - 1,
+        now - 1,
+        now - 1
+      )
     );
     await env.DB.batch(statements);
 
@@ -904,5 +975,11 @@ describe("control worker", () => {
       .bind(Date.now())
       .first<{ count: number }>();
     expect(receiptCount?.count).toBe(0);
+    const relayCount = await env.DB.prepare(
+      "SELECT COUNT(*) AS count FROM relay_requests WHERE expires_at <= ?"
+    )
+      .bind(Date.now())
+      .first<{ count: number }>();
+    expect(relayCount?.count).toBe(0);
   });
 });

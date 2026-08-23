@@ -14,7 +14,7 @@ The project has no user token, user Gateway, automatic user-account message, Dis
 
 ## Current evidence
 
-The source currently passes strict TypeScript checks, 163 package tests, and 23 migration-backed Workers tests. These local results cover relay intake, authenticated ingress, the encrypted queue, dashboard controls, RPC profile isolation, command grammar, Durable Object recovery, D1 persistence, managed rooms, and the silent official-bot voice state machine.
+The source currently passes strict TypeScript checks, 166 package tests, and 23 migration-backed Workers tests. These local results cover relay intake, authenticated ingress, the encrypted queue, dashboard controls, RPC profile isolation, command grammar, Durable Object recovery, D1 persistence, managed rooms, and the silent official-bot voice state machine.
 
 Live Discord and Cloudflare behavior remains separate from source verification. The private `VC Control Lab` server and requested channels exist, and Workers Paid was observed as active. The protected Voice Rooms install, Message Content setting, credentials, command registration, verified `main` RPC profile, live queue run, Worker deployment, and Container probe have not been proven in the current checkpoint.
 

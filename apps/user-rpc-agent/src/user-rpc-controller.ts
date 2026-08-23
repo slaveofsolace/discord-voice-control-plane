@@ -59,6 +59,7 @@ export class UserRpcController {
   #selectedChannel: RpcChannel | null = null;
   #target: AuthorizedTarget | null = null;
   #targetInitialized = false;
+  #targetRevision = 0;
   #unsubscribeSelection: (() => void) | null = null;
   #unsubscribeDisconnect: (() => void) | null = null;
 
@@ -137,6 +138,7 @@ export class UserRpcController {
     const oldTargetSelected = this.isTargetSelected();
     this.#target = target;
     if (changed) {
+      this.#targetRevision += 1;
       await this.options.relayQueue.invalidateContext({
         profileName: this.options.profileName,
         force: authorizationChanged,
@@ -328,20 +330,8 @@ export class UserRpcController {
       throw new Error("RPC_AUTHORIZED_USER_MISMATCH");
     }
     const target = this.requireTarget();
-    if (
-      request.profile_name !== this.options.profileName ||
-      request.target_guild_id !== target.guild_id ||
-      request.target_voice_channel_id !== target.voice_channel_id ||
-      request.target_text_channel_id !== target.text_channel_id
-    ) {
-      await this.options.relayQueue.invalidateContext({
-        profileName: this.options.profileName,
-        targetGuildId: target.guild_id,
-        targetTextChannelId: target.text_channel_id,
-        targetVoiceChannelId: target.voice_channel_id
-      });
-      throw new Error("RELAY_TARGET_CHANGED");
-    }
+    const targetRevision = this.#targetRevision;
+    await this.assertRelayPreparationContext(requestId, request, target, targetRevision);
     const selectedVoice = await this.options.rpc.getSelectedVoiceChannel();
     this.#selectedChannel = selectedVoice;
     if (
@@ -351,11 +341,19 @@ export class UserRpcController {
     ) {
       throw new Error("RPC_VOICE_NOT_CONNECTED");
     }
+    await this.assertRelayPreparationContext(requestId, request, target, targetRevision);
     const selectedText = await this.options.rpc.selectTextChannel(target.text_channel_id);
     if (selectedText?.id !== target.text_channel_id || selectedText.guild_id !== target.guild_id) {
       throw new Error("RPC_TEXT_SELECTION_MISMATCH");
     }
-    await this.options.draftHandoff.stage(request.content);
+    const current = await this.assertRelayPreparationContext(
+      requestId,
+      request,
+      target,
+      targetRevision
+    );
+    if (current.content === null) throw new Error("RELAY_CONTENT_PURGED");
+    await this.options.draftHandoff.stage(current.content);
     return this.options.relayQueue.transition(
       requestId,
       "PREPARED_FOR_MANUAL_SEND",
@@ -389,6 +387,31 @@ export class UserRpcController {
 
   async cancelRelay(requestId: string): Promise<RelayRequest> {
     return this.options.relayQueue.transition(requestId, "CANCELLED", "REQUEST_CANCELLED");
+  }
+
+  private async assertRelayPreparationContext(
+    requestId: string,
+    original: RelayRequest,
+    target: AuthorizedTarget,
+    targetRevision: number
+  ): Promise<RelayRequest> {
+    const current = await this.options.relayQueue.get(requestId);
+    const targetChanged =
+      this.#targetRevision !== targetRevision ||
+      this.#target?.guild_id !== target.guild_id ||
+      this.#target.voice_channel_id !== target.voice_channel_id ||
+      this.#target.text_channel_id !== target.text_channel_id;
+    const requestChanged =
+      current === null ||
+      (current.status !== "PENDING_USER_APPROVAL" && current.status !== "RECEIVED") ||
+      current.profile_name !== this.options.profileName ||
+      current.deployment_id !== this.options.deploymentId ||
+      current.target_guild_id !== target.guild_id ||
+      current.target_voice_channel_id !== target.voice_channel_id ||
+      current.target_text_channel_id !== target.text_channel_id ||
+      current.content !== original.content;
+    if (targetChanged || requestChanged) throw new Error("RELAY_TARGET_CHANGED");
+    return current;
   }
 
   private async enqueueRelay(command: CommandEnvelope): Promise<void> {

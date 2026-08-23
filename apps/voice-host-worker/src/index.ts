@@ -46,9 +46,9 @@ interface Env {
 }
 
 interface AgentStartConfiguration {
-  agentAuthSecret: string;
-  agentEndpoint: string;
-  agentKeyId: string;
+  agentAuthSecret?: string;
+  agentEndpoint?: string;
+  agentKeyId?: string;
   agentPreviousAuthSecret?: string;
   agentPreviousKeyId?: string;
   botToken: string;
@@ -95,9 +95,6 @@ export class VoiceAgentContainer extends Container<Env> {
     }
     if (configuration === undefined) throw new Error("START_CONFIGURATION_REQUIRED");
     const envVars: Record<string, string> = {
-      AGENT_AUTH_SECRET: configuration.agentAuthSecret,
-      AGENT_ENDPOINT: configuration.agentEndpoint,
-      AGENT_KEY_ID: configuration.agentKeyId,
       DEPLOYMENT_ID: configuration.deploymentId,
       DISCORD_BOT_TOKEN: configuration.botToken,
       MANAGED_ROOMS_ENABLED: configuration.managedRoomsEnabled,
@@ -119,6 +116,15 @@ export class VoiceAgentContainer extends Container<Env> {
       RELAY_INGRESS_ENDPOINT: configuration.relayIngressEndpoint,
       RELAY_INGRESS_HMAC_SECRET: configuration.relayIngressHmacSecret
     };
+    if (
+      configuration.agentAuthSecret !== undefined &&
+      configuration.agentEndpoint !== undefined &&
+      configuration.agentKeyId !== undefined
+    ) {
+      envVars.AGENT_AUTH_SECRET = configuration.agentAuthSecret;
+      envVars.AGENT_ENDPOINT = configuration.agentEndpoint;
+      envVars.AGENT_KEY_ID = configuration.agentKeyId;
+    }
     if (configuration.agentPreviousAuthSecret !== undefined) {
       envVars.AGENT_PREVIOUS_AUTH_SECRET = configuration.agentPreviousAuthSecret;
     }
@@ -174,9 +180,6 @@ export class VoiceAgentContainer extends Container<Env> {
 
 function startupConfiguration(env: Env): AgentStartConfiguration {
   return {
-    agentAuthSecret: env.AGENT_AUTH_SECRET,
-    agentEndpoint: env.CONTROL_AGENT_WS_URL,
-    agentKeyId: env.AGENT_KEY_ID,
     botToken: env.DISCORD_BOT_TOKEN,
     deploymentId: env.DEPLOYMENT_ID,
     managedRoomsEnabled: env.MANAGED_ROOMS_ENABLED,
@@ -196,12 +199,19 @@ function startupConfiguration(env: Env): AgentStartConfiguration {
     controlElevatedRoleIds: env.CONTROL_ELEVATED_ROLE_IDS,
     relayIngressEndpoint: env.RELAY_INGRESS_ENDPOINT,
     relayIngressHmacSecret: env.RELAY_INGRESS_HMAC_SECRET,
-    ...(env.AGENT_PREVIOUS_AUTH_SECRET === undefined
+    ...(env.CONTROL_RELAY_ONLY === "true"
       ? {}
-      : { agentPreviousAuthSecret: env.AGENT_PREVIOUS_AUTH_SECRET }),
-    ...(env.AGENT_PREVIOUS_KEY_ID === undefined
-      ? {}
-      : { agentPreviousKeyId: env.AGENT_PREVIOUS_KEY_ID })
+      : {
+          agentAuthSecret: env.AGENT_AUTH_SECRET,
+          agentEndpoint: env.CONTROL_AGENT_WS_URL,
+          agentKeyId: env.AGENT_KEY_ID,
+          ...(env.AGENT_PREVIOUS_AUTH_SECRET === undefined
+            ? {}
+            : { agentPreviousAuthSecret: env.AGENT_PREVIOUS_AUTH_SECRET }),
+          ...(env.AGENT_PREVIOUS_KEY_ID === undefined
+            ? {}
+            : { agentPreviousKeyId: env.AGENT_PREVIOUS_KEY_ID })
+        })
   };
 }
 
@@ -210,11 +220,15 @@ function validateEnvironment(env: Env): VoiceHostMode {
     DEPLOYMENT_ID: env.DEPLOYMENT_ID,
     TENANT_ID: env.TENANT_ID,
     DISCORD_BOT_TOKEN: env.DISCORD_BOT_TOKEN,
-    AGENT_ENDPOINT: env.CONTROL_AGENT_WS_URL,
-    AGENT_AUTH_SECRET: env.AGENT_AUTH_SECRET,
-    AGENT_PREVIOUS_AUTH_SECRET: env.AGENT_PREVIOUS_AUTH_SECRET,
-    AGENT_KEY_ID: env.AGENT_KEY_ID,
-    AGENT_PREVIOUS_KEY_ID: env.AGENT_PREVIOUS_KEY_ID,
+    ...(env.CONTROL_RELAY_ONLY === "true"
+      ? {}
+      : {
+          AGENT_ENDPOINT: env.CONTROL_AGENT_WS_URL,
+          AGENT_AUTH_SECRET: env.AGENT_AUTH_SECRET,
+          AGENT_PREVIOUS_AUTH_SECRET: env.AGENT_PREVIOUS_AUTH_SECRET,
+          AGENT_KEY_ID: env.AGENT_KEY_ID,
+          AGENT_PREVIOUS_KEY_ID: env.AGENT_PREVIOUS_KEY_ID
+        }),
     TARGET_APPROVER_USER_IDS: env.TARGET_APPROVER_USER_IDS,
     PREFIX_COMMANDS_ENABLED: env.PREFIX_COMMANDS_ENABLED,
     MESSAGE_CONTENT_INTENT_ENABLED: env.MESSAGE_CONTENT_INTENT_ENABLED,

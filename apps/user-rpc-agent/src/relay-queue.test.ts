@@ -1,5 +1,5 @@
 /* eslint-disable security/detect-non-literal-fs-filename -- tests use isolated OS temporary directories */
-import { mkdtemp, readFile, rename, rm, writeFile } from "node:fs/promises";
+import { copyFile, mkdtemp, readFile, rename, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -198,6 +198,20 @@ describe("encrypted relay approval queue", () => {
     );
     expect((await queue.list()).map((item) => item.profile_name)).toEqual(["main"]);
     expect((await presence.list()).map((item) => item.profile_name)).toEqual(["presence"]);
+  });
+
+  it("rejects an authenticated queue copied across profile boundaries", async () => {
+    const { queue, root } = await harness();
+    await queue.enqueue(request(1, Date.now()));
+    await copyFile(join(root, "main.relay-queue.key"), join(root, "presence.relay-queue.key"));
+    await copyFile(queue.statePath, join(root, "presence.relay-queue.enc.json"));
+    const presence = new EncryptedRelayQueue({
+      deploymentId: "test",
+      profileName: "presence",
+      secretRoot: root,
+      onStatus: vi.fn()
+    });
+    await expect(presence.initialize()).rejects.toThrow("RELAY_QUEUE_RECOVERY_FAILED");
   });
 
   it("allows prepare rollback but never transitions a terminal receipt", async () => {

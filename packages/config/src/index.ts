@@ -29,6 +29,9 @@ const optionalHttpsUrl = z
     z.literal("")
   ])
   .default("");
+const optionalWssUrl = z
+  .union([z.url().refine((url) => url.startsWith("wss://"), "Expected wss:// URL"), z.literal("")])
+  .default("");
 const profileName = z
   .string()
   .regex(/^[a-z][a-z0-9-]{0,31}$/u)
@@ -112,10 +115,10 @@ export const voiceEnvironmentSchema = z
     DEPLOYMENT_ID: z.string().min(1).max(64),
     TENANT_ID: z.string().min(1).max(64),
     DISCORD_BOT_TOKEN: z.string().min(32),
-    AGENT_ENDPOINT: z.url().refine((url) => url.startsWith("wss://"), "Expected wss:// URL"),
-    AGENT_AUTH_SECRET: z.string().min(32),
+    AGENT_ENDPOINT: optionalWssUrl,
+    AGENT_AUTH_SECRET: z.string().default(""),
     AGENT_PREVIOUS_AUTH_SECRET: z.string().min(32).optional(),
-    AGENT_KEY_ID: z.string().min(1).max(64),
+    AGENT_KEY_ID: z.string().max(64).default(""),
     AGENT_PREVIOUS_KEY_ID: z.string().min(1).max(64).optional(),
     TARGET_APPROVER_USER_IDS: csvSnowflakes,
     PREFIX_COMMANDS_ENABLED: booleanString,
@@ -135,6 +138,32 @@ export const voiceEnvironmentSchema = z
     RELAY_INGRESS_HMAC_SECRET: z.string().default("")
   })
   .superRefine((value, context) => {
+    if (
+      !value.CONTROL_RELAY_ONLY &&
+      (value.AGENT_ENDPOINT === "" ||
+        value.AGENT_AUTH_SECRET.length < 32 ||
+        value.AGENT_KEY_ID.length < 1)
+    ) {
+      context.addIssue({
+        code: "custom",
+        message: "Non-relay voice mode requires the agent endpoint, key ID, and secret",
+        path: ["AGENT_ENDPOINT"]
+      });
+    }
+    if (
+      value.CONTROL_RELAY_ONLY &&
+      (value.AGENT_ENDPOINT !== "" ||
+        value.AGENT_AUTH_SECRET !== "" ||
+        value.AGENT_KEY_ID !== "" ||
+        value.AGENT_PREVIOUS_AUTH_SECRET !== undefined ||
+        value.AGENT_PREVIOUS_KEY_ID !== undefined)
+    ) {
+      context.addIssue({
+        code: "custom",
+        message: "Relay-only mode forbids agent credentials in the bot process",
+        path: ["CONTROL_RELAY_ONLY"]
+      });
+    }
     if (value.PREFIX_COMMANDS_ENABLED && !value.MESSAGE_CONTENT_INTENT_ENABLED) {
       context.addIssue({
         code: "custom",

@@ -90,11 +90,28 @@ describe("agent WebSocket client", () => {
     };
     client.send(queuedStatus);
     client.send({ ...queuedStatus, observed_state: "STARTING", last_health_at: 2 });
+    client.send({
+      type: "relay_status",
+      deployment_id: "test",
+      request_id: "00000000-0000-5000-8000-000000000001",
+      command_id: "00000000-0000-5000-8000-000000000001",
+      actor_user_id: "100000000000000001",
+      source_application_id: "100000000000000002",
+      source_message_id: "100000000000000003",
+      status: "EXPIRED",
+      result_code: "REQUEST_EXPIRED",
+      occurred_at: 2
+    });
 
     await client.start();
     const socket = await connection;
-    await vi.waitFor(() => expect(outboundMessages).toHaveLength(1));
+    await vi.waitFor(() => expect(outboundMessages).toHaveLength(2));
     expect(outboundMessages[0]).toMatchObject({ observed_state: "STARTING", last_health_at: 2 });
+    expect(outboundMessages[1]).toMatchObject({
+      type: "relay_status",
+      status: "EXPIRED",
+      result_code: "REQUEST_EXPIRED"
+    });
     const timestamp = Number(requiredHeader(upgradeHeaders["x-agent-timestamp"]));
     const nonce = requiredHeader(upgradeHeaders["x-agent-nonce"]);
     const signature = requiredHeader(upgradeHeaders["x-agent-signature"]);

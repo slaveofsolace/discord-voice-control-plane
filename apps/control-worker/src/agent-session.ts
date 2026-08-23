@@ -2,6 +2,7 @@ import { DurableObject } from "cloudflare:workers";
 
 import {
   agentMessageSchema,
+  controlActionSchema,
   commandEnvelopeSchema,
   managedRoomSettingsSchema,
   type AgentStatus,
@@ -157,6 +158,9 @@ export class AgentSession extends DurableObject<Env> {
     }
     if (url.pathname === "/relay-claims" && request.method === "POST") {
       return this.acceptRelayClaim(request);
+    }
+    if (url.pathname === "/relay-nonces" && request.method === "POST") {
+      return this.acceptRelayNonce(request);
     }
     if (url.pathname.startsWith("/relay-status/") && request.method === "GET") {
       return this.getRelayStatus(url.pathname.slice("/relay-status/".length));
@@ -443,7 +447,7 @@ export class AgentSession extends DurableObject<Env> {
       !/^\d{17,20}$/u.test(input.actor_user_id) ||
       typeof input.nonce !== "string" ||
       input.nonce.length < 16 ||
-      input.nonce.length > 128
+      input.nonce.length > 134
     ) {
       return Response.json({ error: "INVALID_RELAY_CLAIM" }, { status: 400 });
     }
@@ -479,6 +483,19 @@ export class AgentSession extends DurableObject<Env> {
     );
     await this.scheduleCleanup(expiresAt);
     return Response.json({ duplicate: false, request_id: input.request_id });
+  }
+
+  private async acceptRelayNonce(request: Request): Promise<Response> {
+    const input = await request.json<Record<string, unknown>>();
+    if (typeof input.nonce !== "string" || input.nonce.length < 16 || input.nonce.length > 134) {
+      return Response.json({ error: "INVALID_RELAY_NONCE" }, { status: 400 });
+    }
+    this.purgeExpiredSessionRows();
+    if (!this.consumeNonce(input.nonce)) {
+      return Response.json({ error: "RELAY_NONCE_REPLAY" }, { status: 409 });
+    }
+    await this.scheduleCleanup(Date.now() + 300_000);
+    return Response.json({ accepted: true });
   }
 
   private async abortRelayClaim(request: Request): Promise<Response> {
@@ -595,7 +612,8 @@ export class AgentSession extends DurableObject<Env> {
       )
       .toArray()[0];
     if (executing === undefined) return;
-    const envelope = commandEnvelopeSchema.parse(JSON.parse(executing.envelope_json));
+    const execution = JSON.parse(executing.envelope_json) as { action?: unknown };
+    const action = controlActionSchema.parse(execution.action);
     const expiresAt = Date.now() + 24 * 60 * 60_000;
     this.ctx.storage.sql.exec(
       `INSERT INTO receipts (command_id, ack_json, expires_at) VALUES (?, ?, ?)
@@ -619,7 +637,7 @@ export class AgentSession extends DurableObject<Env> {
       ).bind(
         ack.command_id,
         this.env.DEPLOYMENT_ID,
-        envelope.action,
+        action,
         ack.accepted ? 1 : 0,
         ack.result_code,
         ack.summary,
@@ -675,11 +693,12 @@ export class AgentSession extends DurableObject<Env> {
       );
       return;
     }
+    const envelope = commandEnvelopeSchema.parse(JSON.parse(pending.envelope_json));
     const expiresAt = Date.now() + 24 * 60 * 60_000;
     this.ctx.storage.sql.exec(
       "INSERT INTO executing_commands (command_id, envelope_json, expires_at) VALUES (?, ?, ?)",
       start.command_id,
-      pending.envelope_json,
+      JSON.stringify({ action: envelope.action }),
       expiresAt
     );
     this.ctx.storage.sql.exec(

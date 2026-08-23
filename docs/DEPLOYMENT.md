@@ -47,7 +47,7 @@ PREFIX_COMMANDS_ENABLED=false
 MANAGED_ROOMS_ENABLED=false
 ```
 
-Relay-only mode is mandatory for this product path. It keeps Voice Rooms out of AgentSession so the local RPC client remains the sole authorized user-presence agent.
+Relay-only mode is mandatory for this product path. It keeps Voice Rooms out of AgentSession so the local RPC client remains the sole authorized user-presence agent. The voice-host Worker also omits the agent endpoint, key ID, and agent HMAC secrets from the relay-only bot Container.
 
 Set `RELAY_INGRESS_ENDPOINT` to the control Worker `/internal/relay-ingress` route. Store `RELAY_INGRESS_HMAC_SECRET` independently in the control and private Voice Rooms secret scopes. Never put it in tracked Wrangler configuration.
 

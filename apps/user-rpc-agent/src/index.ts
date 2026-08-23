@@ -53,52 +53,15 @@ function log(
 
 const ipc = new DiscordIpcClient(environment.USER_RPC_DISCORD_APPLICATION_ID);
 const rpc = new DiscordRpcSession(ipc, environment.USER_RPC_DISCORD_APPLICATION_ID);
-let agentClient: AgentClient | null = null;
 const receipts = new Map<string, CommandAck>();
-const secretRoot = resolve(environment.USER_RPC_SECRET_ROOT);
-const profileLock = await ProfileRuntimeLock.acquire(
-  secretRoot,
-  environment.DEPLOYMENT_ID,
-  environment.USER_RPC_PROFILE_NAME
-);
-const relayQueue = new EncryptedRelayQueue({
-  deploymentId: environment.DEPLOYMENT_ID,
-  profileName: environment.USER_RPC_PROFILE_NAME,
-  secretRoot,
-  onStatus: (event) => agentClient?.send(event)
-});
-await relayQueue.initialize();
-const dashboardSecret = await ensureDashboardSecret(secretRoot, environment.USER_RPC_PROFILE_NAME);
+const runtime: { controller: UserRpcController | null } = { controller: null };
 
-const controller = new UserRpcController({
-  allowedGuildId: environment.USER_RPC_ALLOWED_GUILD_ID,
-  deploymentId: environment.DEPLOYMENT_ID,
-  draftHandoff: new WindowsClipboardDraftHandoff(),
-  profileName: environment.USER_RPC_PROFILE_NAME,
-  relayQueue,
-  rpc,
-  onStatus: (status) => agentClient?.send(status)
-});
-
-async function applyBootstrap(bootstrap: AgentBootstrap): Promise<void> {
-  await controller.setTarget(bootstrap.authorized_target);
-  await controller.applyDesiredState(bootstrap.desired_connected, bootstrap.paused);
+function requireController(): UserRpcController {
+  if (runtime.controller === null) throw new Error("USER_RPC_CONTROLLER_NOT_READY");
+  return runtime.controller;
 }
 
-async function handleControlCommand(command: CommandEnvelope, duplicate: boolean): Promise<void> {
-  if (duplicate) {
-    const receipt = receipts.get(command.command_id);
-    if (receipt !== undefined) {
-      agentClient?.send({ ...receipt, duplicate: true, occurred_at: Date.now() });
-    }
-    return;
-  }
-  const receipt = await controller.execute(command);
-  receipts.set(command.command_id, receipt);
-  agentClient?.send(receipt);
-}
-
-agentClient = new AgentClient({
+const agentClient = new AgentClient({
   deploymentId: environment.DEPLOYMENT_ID,
   tenantId: environment.TENANT_ID,
   endpoint: environment.AGENT_ENDPOINT,
@@ -110,10 +73,54 @@ agentClient = new AgentClient({
   ...(environment.AGENT_PREVIOUS_AUTH_SECRET === undefined
     ? {}
     : { previousSecret: environment.AGENT_PREVIOUS_AUTH_SECRET }),
-  onBlocked: (code) => controller.handleControlPlaneFailure(code),
+  onBlocked: (code) => requireController().handleControlPlaneFailure(code),
   onBootstrap: applyBootstrap,
   onCommand: handleControlCommand
 });
+const secretRoot = resolve(environment.USER_RPC_SECRET_ROOT);
+const profileLock = await ProfileRuntimeLock.acquire(
+  secretRoot,
+  environment.DEPLOYMENT_ID,
+  environment.USER_RPC_PROFILE_NAME
+);
+const relayQueue = new EncryptedRelayQueue({
+  deploymentId: environment.DEPLOYMENT_ID,
+  profileName: environment.USER_RPC_PROFILE_NAME,
+  secretRoot,
+  onStatus: (event) => agentClient.send(event)
+});
+await relayQueue.initialize();
+const dashboardSecret = await ensureDashboardSecret(secretRoot, environment.USER_RPC_PROFILE_NAME);
+
+const controller = new UserRpcController({
+  allowedGuildId: environment.USER_RPC_ALLOWED_GUILD_ID,
+  deploymentId: environment.DEPLOYMENT_ID,
+  draftHandoff: new WindowsClipboardDraftHandoff(),
+  profileName: environment.USER_RPC_PROFILE_NAME,
+  relayQueue,
+  rpc,
+  onStatus: (status) => agentClient.send(status)
+});
+runtime.controller = controller;
+
+async function applyBootstrap(bootstrap: AgentBootstrap): Promise<void> {
+  const currentController = requireController();
+  await currentController.setTarget(bootstrap.authorized_target);
+  await currentController.applyDesiredState(bootstrap.desired_connected, bootstrap.paused);
+}
+
+async function handleControlCommand(command: CommandEnvelope, duplicate: boolean): Promise<void> {
+  if (duplicate) {
+    const receipt = receipts.get(command.command_id);
+    if (receipt !== undefined) {
+      agentClient.send({ ...receipt, duplicate: true, occurred_at: Date.now() });
+    }
+    return;
+  }
+  const receipt = await requireController().execute(command);
+  receipts.set(command.command_id, receipt);
+  agentClient.send(receipt);
+}
 
 const dashboard = new LocalRelayDashboard({ controller, port, secret: dashboardSecret.secret });
 
@@ -132,13 +139,13 @@ log("info", "relay_dashboard_ready", {
 });
 
 const heartbeatTimer = setInterval(() => {
-  agentClient?.send({
+  agentClient.send({
     type: "heartbeat",
     deployment_id: environment.DEPLOYMENT_ID,
     sent_at: Date.now(),
     gateway_sequence: null
   });
-  agentClient?.send(controller.status);
+  agentClient.send(controller.status);
   void relayQueue.expire();
   const cutoff = Date.now() - 24 * 60 * 60_000;
   for (const [commandId, receipt] of receipts) {

@@ -262,6 +262,15 @@ async function abortRelayClaim(env: Env, requestId: string): Promise<void> {
   ]);
 }
 
+async function acceptRelayNonce(env: Env, nonce: string): Promise<boolean> {
+  const response = await sessionStub(env).fetch("https://session/relay-nonces", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ nonce: `relay:${nonce}` })
+  });
+  return response.ok;
+}
+
 async function handleRelayCreate(
   input: Extract<RelayIngressRequest, { operation: "create" }>,
   nonce: string,
@@ -388,6 +397,9 @@ async function handleRelayStatusOrCancel(
   nonce: string,
   env: Env
 ): Promise<Response> {
+  if (!(await acceptRelayNonce(env, nonce))) {
+    return relayResponse(false, input.request_id, null, "RELAY_NONCE_REPLAY", false, 409);
+  }
   const record = await getRelaySessionRecord(env, input.request_id);
   if (record === null)
     return relayResponse(false, input.request_id, null, "REQUEST_NOT_FOUND", false, 404);
@@ -453,7 +465,7 @@ async function handleRelayIngress(request: Request, env: Env): Promise<Response>
     Math.abs(Date.now() - timestamp) > 30_000 ||
     nonce.length < 16 ||
     nonce.length > 128 ||
-    signature.length < 43
+    signature.length !== 43
   ) {
     return relayResponse(false, null, null, "RELAY_INGRESS_UNAUTHORIZED", false, 401);
   }

@@ -45,4 +45,17 @@ describe("authorized user relay negative source checks", () => {
     expect(combined).not.toContain("target_message_id");
     expect(combined).not.toContain("OWNER_VERIFIED_DELIVERY");
   });
+
+  it("keeps agent authentication material out of relay-only bot containers", async () => {
+    const host = await source("apps/voice-host-worker/src/index.ts");
+    const containerEnvironment = host.slice(
+      host.indexOf("const envVars"),
+      host.indexOf("await this.startAndWaitForPorts")
+    );
+    expect(containerEnvironment).not.toContain("AGENT_AUTH_SECRET: configuration.agentAuthSecret");
+    expect(containerEnvironment).toContain(
+      "envVars.AGENT_AUTH_SECRET = configuration.agentAuthSecret"
+    );
+    expect(host).toContain('env.CONTROL_RELAY_ONLY === "true"');
+  });
 });

@@ -335,7 +335,7 @@
       "access": "GENERATED_CURRENT",
       "locator": "docs/TEST_EVIDENCE.md",
       "captured_at": "2026-08-22T09:13:31Z",
-      "integrity": "Sanitized current checkpoint: formatting, typed lint, strict typecheck, workspace builds, 163 package tests across 30 files, 23 migration-backed Workers tests, copy triage, 156-file secret scan, dependency audit, Anti-AI scan, ledger validation, and diff check passed before the documentation checkpoint.",
+      "integrity": "Sanitized current checkpoint: formatting, typed lint, strict typecheck, workspace builds, 166 package tests across 30 files, 23 migration-backed Workers tests, copy triage, 156-file secret scan, dependency audit, Anti-AI scan, ledger validation, and diff check passed after the bounded security-remediation pass. Fresh immutable-security and exact-SHA CI gates remain before publication.",
       "supports_claim_ids": ["claim_objective"],
       "contradicts_claim_ids": []
     },

@@ -9,6 +9,7 @@
 - Added prepare-time OAuth identity, RPC, target, selected-voice, TTL, and state checks before fixed-path `clip.exe` preparation. The owner still performs the final paste and send; `OWNER_CONFIRMED_SENT` is not Discord delivery proof.
 - Added separate profile keys, queues, and deployment locks, plus invalidation after a target or profile authorization change.
 - Added negative-source checks proving the absence of raw user tokens, a user Gateway, automatic user-account sends, Discord UI keystrokes, PowerShell clipboard handling, synthetic audio, and scheduled keepalive behavior.
+- Removed full relay bodies from the Durable Object execution ledger, added physical relay-metadata expiry, kept agent credentials out of relay-only bot Containers, rechecked target revisions before manual preparation, preserved startup expiry events, and consumed every signed ingress nonce.
 
 - Added durable Discord interaction claims, a pre-effect execution ledger, expiring/revalidated agent sessions, fail-closed audit capacity, and keyed state reconciliation with dead-letter blocking.
 - Added a 64 KiB interaction-body limit, complete runtime environment validation, rotation-key separation checks, and minimal Container health output.

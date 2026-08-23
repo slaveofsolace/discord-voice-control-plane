@@ -74,6 +74,7 @@ export async function recentAudit(env: Env, limit: number): Promise<AuditRow[]> 
 export async function purgeExpiredAudit(env: Env): Promise<void> {
   await env.DB.batch([
     env.DB.prepare("DELETE FROM audit_events WHERE expires_at <= ?").bind(Date.now()),
-    env.DB.prepare("DELETE FROM command_receipts WHERE expires_at <= ?").bind(Date.now())
+    env.DB.prepare("DELETE FROM command_receipts WHERE expires_at <= ?").bind(Date.now()),
+    env.DB.prepare("DELETE FROM relay_requests WHERE expires_at <= ?").bind(Date.now())
   ]);
 }

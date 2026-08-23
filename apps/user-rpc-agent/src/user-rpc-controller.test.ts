@@ -244,6 +244,27 @@ describe("authorized local user RPC controller", () => {
     );
   });
 
+  it("stops preparation when target authorization changes during an RPC recheck", async () => {
+    const { controller, draftHandoff, relayQueue, rpc } = harness();
+    await controller.initialize("oauth-access-token", ids.user);
+    await controller.setTarget(target);
+    relayQueue.get.mockResolvedValue(pendingRelay());
+    let resolveVoice: (value: RpcChannel) => void = () => undefined;
+    rpc.getSelectedVoiceChannel.mockImplementationOnce(
+      () =>
+        new Promise<RpcChannel>((resolve) => {
+          resolveVoice = resolve;
+        })
+    );
+    const preparation = controller.prepareRelay(pendingRelay().request_id);
+    await vi.waitFor(() => expect(rpc.authenticate).toHaveBeenCalledTimes(2));
+    await controller.setTarget({ ...target, authorized_at: 2 });
+    resolveVoice(channel(ids.voice));
+    await expect(preparation).rejects.toThrow("RELAY_TARGET_CHANGED");
+    expect(rpc.selectTextChannel).not.toHaveBeenCalled();
+    expect(draftHandoff.stage).not.toHaveBeenCalled();
+  });
+
   it("blocks when the authorized desktop RPC pipe closes", async () => {
     const { controller, disconnect } = harness();
     await controller.initialize("oauth-access-token", ids.user);

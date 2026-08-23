@@ -41,9 +41,9 @@ The local agent stores accepted content in a per-profile AES-256-GCM queue. Its 
 
 ## 5. Verification evidence
 
-Local verification currently records 163 package tests across 30 files and 23 migration-backed Workers tests. Coverage includes authorization, grammar, risk, HMAC/timestamp/replay/tamper/idempotency, offline privacy, D1 redaction, queue encryption/recovery/TTL/cap/FIFO/cancellation, dashboard security, prepare-time revalidation, fixed `clip.exe` behavior, lifecycle status, profile isolation, wrong-user blocking, and forbidden-source checks.
+Local verification currently records 166 package tests across 30 files and 23 migration-backed Workers tests. Coverage includes authorization, grammar, risk, HMAC/timestamp/replay/tamper/idempotency, offline privacy, D1 redaction and expiry, queue encryption/recovery/TTL/cap/FIFO/cancellation, dashboard security, prepare-time target-revision revalidation, fixed `clip.exe` behavior, lifecycle status, profile isolation, wrong-user blocking, relay-only secret isolation, and forbidden-source checks.
 
-Formatting, typed lint, strict typecheck, all workspace builds, 163 package tests, 23 Workers tests, the 156-file secret scan, dependency audit, 22-file copy triage, Anti-AI scan, Human Cortex schema validation, and diff check passed before the documentation checkpoint. The immutable-range security result and exact-SHA CI URL are reported outside this commit.
+Formatting, typed lint, strict typecheck, all workspace builds, 166 package tests, 23 Workers tests, the 156-file secret scan, dependency audit, 22-file copy triage, Anti-AI scan, Human Cortex schema validation, and diff check passed after the security-remediation pass. The first immutable review's six low-severity findings were remediated locally. The fresh immutable-range security result and exact-SHA CI URL are reported outside this checkpoint after they run.
 
 These tests do not prove live Discord, OAuth, voice, Cloudflare, Container, or Socialize behavior.
 
