@@ -25,8 +25,8 @@ Live completion is `PARTIAL`. Protected Discord grants, a verified `main` RPC pr
 | Profile isolation           | `main` preserved; separate profile/key/queue/lock; target/profile change invalidation                                       | `UNIT TESTED`        | Manually authorize and verify `main`               |
 | Forbidden paths absent      | Source-negative tests cover raw token, user Gateway, send API, UI keystrokes, PowerShell clipboard, audio, keepalive        | `UNIT TESTED`        | Preserve in future reviews                         |
 | Reusable official-bot path  | Managed rooms, slash/prefix commands, silent DAVE voice state, host/probe adapters retained                                 | `UNIT TESTED`        | Live official-bot and Container proof              |
-| Public wording and security | Copy triage, Anti-AI scan, 156-file secret scan, dependency audit, ledger validation, and diff check passed                 | `VALIDATED`          | Complete immutable-range security scan before push |
-| Publication                 | Local `main` contains four focused relay checkpoints after the security-remediation commit                                  | `PENDING`            | Final immutable review, push, exact-SHA CI         |
+| Public wording and security | Copy triage, Anti-AI scan, 156-file secret scan, dependency audit, ledger validation, and diff check passed                 | `VALIDATED`          | Repeat these gates for later changes               |
+| Publication                 | `main` and `origin/main` matched at `900ac835f6b7ec7ede86dfd03a08cc9ad4991a66`; exact-SHA CI run `32608803657` passed       | `VALIDATED`          | Keep later evidence commits behind the same gates  |
 | Socialize                   | No bot install, authorization, join, message, modification, or measurement                                                  | `BLOCKED`            | Staff intake plus supported persistence/exemption  |
 
 ## Evidence boundaries
@@ -40,7 +40,7 @@ Live completion is `PARTIAL`. Protected Discord grants, a verified `main` RPC pr
 
 Workers Paid was observed as active, so no further payment step is presently identified. This does not prove deployment.
 
-A prior “auth granted” message was not tied to a verified, profile-bound `main` RPC identity and exact target. No protected profile content was opened for this audit. The earlier staged seven-permission Voice Rooms consent is obsolete; relay-only mode uses the four-permission private profile.
+A prior “auth granted” message was not tied to a verified, profile-bound `main` RPC identity and exact target. No protected profile content was opened for this audit. The earlier staged seven-permission Voice Rooms consent is obsolete; relay-only mode uses the four-permission private profile. The owner enabled Message Content for Voice Rooms, and the Developer Portal displayed `Bot successfully updated!`; the four-permission bot installation remains pending.
 
 The next live phase starts in the private lab. Login, MFA, CAPTCHA, credential display/copying, privileged-intent toggling, permission confirmation, and OAuth approval remain manual.
 
