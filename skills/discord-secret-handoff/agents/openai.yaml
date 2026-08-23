@@ -1,0 +1,4 @@
+interface:
+  display_name: "Discord Secret Handoff"
+  short_description: "Capture Discord secrets without exposing them"
+  default_prompt: "Use $discord-secret-handoff to open the protected Discord credential capture flow safely."
