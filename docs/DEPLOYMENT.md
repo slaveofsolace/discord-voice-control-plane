@@ -26,7 +26,7 @@ The private server is `VC Control Lab`, with `voice-control` and `voice-probe`.
 
 Stop for login, MFA, CAPTCHA, credential display/copying, privileged-intent changes, OAuth approval, and permission confirmation. Those are owner actions.
 
-On Windows, `pnpm secrets:local` creates an ignored, current-user directory and prompts without echo for protected Discord credentials. Use `pnpm with:local-discord-secrets -- <command>` to inject them into a trusted child process. Do not print or commit the resulting files.
+On Windows, `pnpm secrets:local` creates an ignored, current-user directory and prompts without echo for protected Discord credentials. The repository and installed copies of `$discord-secret-handoff` prepare this flow and verify it without revealing values. The owner still performs token/client-secret creation or revelation, password/MFA, copy, paste into the hidden prompt, and Enter. Use `pnpm with:local-discord-secrets -- <command>` to inject the stored values into a trusted child process. Do not print or commit the resulting files.
 
 ## 3. Private relay configuration
 
@@ -119,7 +119,7 @@ Do not install user-logon startup until this matrix passes. Any later startup mu
 
 ## 7. Voice-host and Container proof
 
-The Cloudflare private voice-host path remains available for reusable official-bot hosting. It has no public route and is the only Worker with the bot token.
+The Cloudflare private voice-host path remains available for reusable official-bot hosting. It has no public route and is the only Worker with the bot token. A Docker-compatible CLI and running engine are required for Wrangler's Container build, including a full dry run. `--containers-rollout=none` validates only the Worker and Container binding configuration; it is not image or runtime evidence.
 
 Run the isolated probe before production voice hosting. Two distinct runs must prove DNS, HTTPS, Gateway, UDP discovery send/receive, Discord IP discovery, DAVE negotiation and renegotiation, stable silent connection, controlled recovery, native compatibility, no inbound UDP listener dependency, clean SIGTERM, and lifecycle restart. An image build or health endpoint is insufficient.
 

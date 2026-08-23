@@ -52,7 +52,7 @@
         "unknown_disposition": "Container UDP, DAVE, and lifecycle behavior require live proof."
       },
       "current_state_history": {
-        "summary": "The official-bot implementation remains reusable. Local main now adds a bounded RPC adapter, exact profile/user/guild/target binding, relay-only private intake, authenticated ingress, an encrypted local approval queue, and manual preparation; publication and all protected live behavior remain unverified.",
+        "summary": "The official-bot implementation remains reusable. Published main contains the bounded RPC adapter, exact profile/user/guild/target binding, relay-only private intake, authenticated ingress, encrypted local approval queue, and manual preparation. Local commits now add fail-closed relay deployment wiring and a protected Discord credential-handoff skill; protected credentials and runtime behavior remain unverified.",
         "knowledge": "KNOWN",
         "load_bearing": true,
         "claim_ids": [
@@ -223,7 +223,7 @@
     {
       "id": "claim_live_setup",
       "label": "MEASURED",
-      "statement": "Authenticated live UI shows VC Control Lab with voice-control and voice-probe, both Discord applications, and Workers Paid as the current Cloudflare plan; no credential, privileged-intent change, permission grant, or deployment exists yet.",
+      "statement": "Authenticated live UI shows VC Control Lab with voice-control and voice-probe, both Discord applications, and Workers Paid as the current Cloudflare plan. The owner confirmed the locked Voice Rooms grant, and the Developer Portal confirmed Message Content was saved; no protected credential or deployment exists yet.",
       "evidence_ids": ["ev_live_setup", "ev_cloudflare_paid", "ev_voice_rooms_created"],
       "contradiction_claim_ids": [],
       "confidence": {
@@ -256,7 +256,7 @@
     {
       "id": "claim_unknown",
       "label": "UNKNOWN",
-      "statement": "Both Discord applications exist and VC Control was installed in the private lab; Voice Rooms permission grant, Message Content, credentials, private-guild behavior, a verified main RPC profile, queue/dashboard behavior, Cloudflare deployment, rollback, and Socialize retention remain unresolved.",
+      "statement": "Both Discord applications exist and are installed in the private lab, and Message Content was saved. Protected credentials, command registration, private-guild behavior, a verified main RPC profile, queue/dashboard behavior, Cloudflare deployment and Container proof, rollback, and Socialize retention remain unresolved.",
       "evidence_ids": [
         "ev_live_setup",
         "ev_runtime_prerequisites",
@@ -266,13 +266,13 @@
       "contradiction_claim_ids": [],
       "confidence": {
         "level": "LOW",
-        "basis": "Both applications now exist, but no live command, voice, permission, credential, or deployed Container evidence exists yet."
+        "basis": "Both applications and the private grant now exist, but no live command, credential, RPC profile, queue, deployed Worker, or Container evidence exists yet."
       }
     },
     {
       "id": "claim_automation_boundary",
       "label": "OBSERVED",
-      "statement": "The owner delegated ordinary already-authenticated Discord setup to Computer control while CAPTCHA, credential display or copying, privileged-intent changes, and permission confirmations remain manual owner actions.",
+      "statement": "The owner delegated ordinary already-authenticated Discord setup and requested a reusable handoff skill. Computer may open the exact page and protected prompt, while CAPTCHA, credential creation/revelation/copying, password/MFA, privileged-intent changes, and permission confirmations remain manual owner actions.",
       "evidence_ids": ["ev_user_resume_decision"],
       "contradiction_claim_ids": [],
       "confidence": {
@@ -283,12 +283,12 @@
     {
       "id": "claim_vc_control_install",
       "label": "MEASURED",
-      "statement": "Discord confirmed that VC Control was authorized and added to VC Control Lab; the ungranted seven-permission Voice Rooms consent is now obsolete and a four-permission relay-only consent is required.",
+      "statement": "Discord confirmed that VC Control was authorized and added to VC Control Lab. The owner later confirmed the locked four-permission Voice Rooms installation; the earlier ungranted seven-permission consent is obsolete.",
       "evidence_ids": ["ev_vc_control_install"],
       "contradiction_claim_ids": [],
       "confidence": {
         "level": "HIGH",
-        "basis": "The authenticated setup checkpoint was inspected without exposing identifiers or credentials; the later owner decision changes the required Voice Rooms permission profile before approval."
+        "basis": "The authenticated setup checkpoint and Developer Portal confirmation were inspected without exposing credentials, and the owner explicitly confirmed the locked grant."
       }
     },
     {
@@ -334,8 +334,8 @@
       "kind": "TEST_RESULT",
       "access": "GENERATED_CURRENT",
       "locator": "docs/TEST_EVIDENCE.md",
-      "captured_at": "2026-08-22T09:13:31Z",
-      "integrity": "Sanitized current checkpoint: formatting, typed lint, strict typecheck, workspace builds, 166 package tests across 30 files, 23 migration-backed Workers tests, copy triage, 156-file secret scan, dependency audit, Anti-AI scan, ledger validation, and diff check passed after the bounded security-remediation pass. Fresh immutable-security and exact-SHA CI gates remain before publication.",
+      "captured_at": "2026-08-23T03:27:00Z",
+      "integrity": "Sanitized current checkpoint: formatting, typed lint, strict typecheck, workspace builds, 170 package tests across 30 files, 23 migration-backed Workers tests, 24-file copy triage, 158-file secret scan, dependency audit, Anti-AI scan, ledger and skill validation, installed-skill hash comparison, and diff check pass. Fresh diff-security, publication, and exact-SHA CI gates remain before release.",
       "supports_claim_ids": ["claim_objective"],
       "contradicts_claim_ids": []
     },
@@ -364,8 +364,8 @@
       "kind": "MEASUREMENT",
       "access": "INSPECTED_CURRENT",
       "locator": "docs/TEST_EVIDENCE.md#current-checkpoint",
-      "captured_at": "2026-08-22T02:24:00-05:00",
-      "integrity": "Sanitized authenticated account observation: Workers Paid is the current plan and Containers are included; account identifiers, billing data, and raw UI output are excluded.",
+      "captured_at": "2026-08-23T03:27:00Z",
+      "integrity": "Sanitized authenticated account observation: Workers Paid is current; Wrangler 4.125.0 is OAuth-authenticated with Workers, D1, and Containers access; all three project deployment lists are empty; account identifiers, billing data, and raw credentials are excluded.",
       "supports_claim_ids": ["claim_live_setup"],
       "contradicts_claim_ids": []
     },
@@ -374,8 +374,8 @@
       "kind": "MEASUREMENT",
       "access": "INSPECTED_CURRENT",
       "locator": "docs/TEST_EVIDENCE.md#current-checkpoint",
-      "captured_at": "2026-08-22T09:00:11Z",
-      "integrity": "Sanitized authenticated UI observation: VC Control Lab, voice-control, voice-probe, VC Control, and Voice Rooms exist; public identifiers are retained only under ignored runtime state; no credential was displayed or copied.",
+      "captured_at": "2026-08-23T03:27:00Z",
+      "integrity": "Sanitized authenticated UI and owner observation: VC Control Lab, voice-control, voice-probe, VC Control, and Voice Rooms exist; the locked Voice Rooms grant is owner-confirmed and Message Content was saved; public identifiers remain under ignored runtime state and no credential was displayed or copied by the agent.",
       "supports_claim_ids": ["claim_live_setup", "claim_unknown"],
       "contradicts_claim_ids": []
     },
@@ -394,8 +394,8 @@
       "kind": "LOG",
       "access": "GENERATED_CURRENT",
       "locator": "docs/COMPLETION_AUDIT.md#external-live-gates",
-      "captured_at": "2026-08-22T01:33:11-05:00",
-      "integrity": "Sanitized gate state: both Discord applications exist, protected intents, credentials and grants remain open, Workers Paid is active, published main CI is green, and no credential or account identifier is committed.",
+      "captured_at": "2026-08-23T03:27:00Z",
+      "integrity": "Sanitized gate state: both Discord applications and the locked private grant exist, Message Content is saved, protected credentials remain absent, Workers Paid and Wrangler authentication are active, Docker and all deployments are absent, and no credential or account identifier is committed.",
       "supports_claim_ids": ["claim_unknown"],
       "contradicts_claim_ids": []
     },
@@ -404,8 +404,8 @@
       "kind": "MEASUREMENT",
       "access": "INSPECTED_CURRENT",
       "locator": "docs/TEST_EVIDENCE.md#current-checkpoint",
-      "captured_at": "2026-08-22T09:00:11Z",
-      "integrity": "Sanitized authenticated Discord Developer Portal observation: Voice Rooms exists and its Bot page is available; its public application ID is retained only under ignored runtime state; no token was displayed or copied.",
+      "captured_at": "2026-08-23T03:27:00Z",
+      "integrity": "Sanitized authenticated Discord Developer Portal observation: Voice Rooms exists, its Bot page is open, Message Content was saved, and the owner confirmed its locked lab installation; its public application ID is retained only under ignored runtime state and no token was displayed or copied by the agent.",
       "supports_claim_ids": ["claim_live_setup", "claim_unknown"],
       "contradicts_claim_ids": []
     },
@@ -414,8 +414,8 @@
       "kind": "HUMAN_DECISION",
       "access": "INSPECTED_CURRENT",
       "locator": "docs/DECISIONS.md",
-      "captured_at": "2026-08-22T09:00:11Z",
-      "integrity": "Current user decision delegates ordinary setup to Computer control without expanding CAPTCHA, credential, privileged-intent, permission, or target-guild authority.",
+      "captured_at": "2026-08-23T03:27:00Z",
+      "integrity": "Current user decision delegates ordinary setup and asks for a reusable safe handoff skill. The validated skill automates page/prompt preparation and redacted verification without expanding CAPTCHA, credential creation/revelation/copying, password/MFA, permission, or target-guild authority.",
       "supports_claim_ids": ["claim_automation_boundary"],
       "contradicts_claim_ids": []
     },
@@ -424,8 +424,8 @@
       "kind": "MEASUREMENT",
       "access": "INSPECTED_CURRENT",
       "locator": "docs/TEST_EVIDENCE.md#current-checkpoint",
-      "captured_at": "2026-08-22T14:16:58.878Z",
-      "integrity": "Sanitized authenticated Discord observation: VC Control is authorized in VC Control Lab; the ungranted seven-permission Voice Rooms consent is obsolete after the relay-only decision and must be replaced; identifiers and credentials are excluded.",
+      "captured_at": "2026-08-23T03:27:00Z",
+      "integrity": "Sanitized Discord observation and owner confirmation: VC Control and the locked four-permission Voice Rooms profile are authorized in VC Control Lab; the earlier ungranted seven-permission consent is obsolete; identifiers and credentials are excluded.",
       "supports_claim_ids": ["claim_vc_control_install", "claim_unknown"],
       "contradicts_claim_ids": []
     },
@@ -743,7 +743,7 @@
   },
   "closure": {
     "status": "OPEN",
-    "summary": "The private relay intake, authenticated ingress, encrypted local queue/dashboard, RPC preparation, profile isolation, and manual final-send boundary are locally tested. Final publication/CI, Voice Rooms consent, protected credentials, a verified main RPC profile, Cloudflare deployment, private-lab proof, rollback, and Socialize evidence remain pending, blocked, or unverified.",
+    "summary": "The private relay intake, authenticated ingress, encrypted local queue/dashboard, RPC preparation, profile isolation, deployment-variable wiring, protected credential handoff, and manual final-send boundary are locally tested or validated. Final publication/CI, protected credentials, command registration, a verified main RPC profile, Cloudflare deployment and Container proof, private-lab behavior, rollback, and Socialize evidence remain pending, blocked, or unverified.",
     "residual_risks": [
       "Cloudflare Containers may fail a live UDP, DAVE, native-library, or lifecycle gate.",
       "Discord may not grant RPC partner/tester access, the local desktop may not be a viable persistent host, or Socialize may not provide a supported persistence or timeout-exemption mechanism.",

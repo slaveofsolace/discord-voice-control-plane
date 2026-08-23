@@ -13,6 +13,7 @@ These project decisions are authoritative until the owner explicitly changes the
 - Public defaults are slash-command-only. Prefixes, Message Content, relay intake, and managed rooms fail closed unless explicitly configured. Relay-only mode forbids managed rooms and prefix handling.
 - No raw user token, user Gateway, automatic user-account message, Discord UI keystroke, synthetic audio, scheduled activity, or anti-AFK claim is allowed.
 - Login, MFA, CAPTCHA, credential display or copying, privileged-intent changes, permission grants, and OAuth approval remain manual owner actions.
+- `$discord-secret-handoff` may open the exact Developer Portal page, start a hidden user-only prompt, and verify the resulting file and Discord identity without revealing values. It does not expand the manual credential boundary.
 - User-logon startup is not installed until the private-lab acceptance matrix passes.
 - Socialize is untouched. Staff must provide an approved window, exact targets, contacts, and a supported persistent-room or timeout-exemption mechanism before any target action.
 - Source tests, private-lab behavior, Cloudflare deployment, local RPC behavior, and target-guild behavior use separate evidence labels. Unobserved behavior stays `UNVERIFIED` or `BLOCKED`.

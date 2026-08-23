@@ -9,6 +9,12 @@
 5. Confirm Cloudflare audit and relay records contain hashes and routing metadata, never content.
 6. Do not proceed after an unexplained moderator move, disconnect, permission loss, or target change.
 
+## Protected Discord credential handoff
+
+Use `$discord-secret-handoff` to inspect and start `pnpm secrets:local`. It may open the exact application page and expose the hidden terminal prompt. The owner performs token/client-secret creation or revelation, password/MFA, copy, paste into the hidden prompt, and Enter. Never paste a credential into chat.
+
+After the prompt completes, verify only that the ignored user-only file exists, contains both expected key names, and passes ACL and documented Discord identity/guild checks. Do not print values, hashes, prefixes, suffixes, Authorization headers, or precise lengths. If capture or identity verification fails, do not deploy.
+
 ## Relay lifecycle
 
 1. An operator sends ordinary text or an exact `!voice` or `!v` command in the locked private relay channel.

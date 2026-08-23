@@ -6,9 +6,9 @@
 - Root: `C:\AI Projects\discord-voice-control-plane`
 - Branch: `main`
 - Recovery evidence: external patch, untracked-file hash manifest, and repository-state record under `C:\AI Projects\.codex-recovery\discord-voice-control-plane-20260822-182407`
-- Reviewable implementation checkpoints: `db74bed` for the inherited Discord RPC adapter, `bfe8824` for private relay intake, authenticated ingress, encrypted queue, and dashboard, and `900ac83` for final relay-boundary hardening
+- Reviewable implementation checkpoints: `db74bed` for the inherited Discord RPC adapter, `bfe8824` for private relay intake, authenticated ingress, encrypted queue, and dashboard, `900ac83` for relay-boundary hardening, `ddd1a0e` for relay deployment wiring, and `7076ff4` for the protected Discord handoff skill
 
-The completed relay source checkpoint was published directly to `main` at `900ac835f6b7ec7ede86dfd03a08cc9ad4991a66`. Exact-SHA CI run `32608803657` passed. A later evidence-only commit must report its own SHA and CI result in the delivery closeout because a commit cannot contain its own final identity.
+The prior public checkpoint was published directly to `main` at `3d3309aba112303b5dd7d400da2b21daf8b2010b`. Exact-SHA CI run `32614534096` passed. The current deployment and skill commits require a fresh final gate, push, and exact-SHA CI run. The delivery closeout reports that final identity because a commit cannot contain its own SHA.
 
 ## 2. Product model
 
@@ -41,17 +41,17 @@ The local agent stores accepted content in a per-profile AES-256-GCM queue. Its 
 
 ## 5. Verification evidence
 
-Local verification currently records 166 package tests across 30 files and 23 migration-backed Workers tests. Coverage includes authorization, grammar, risk, HMAC/timestamp/replay/tamper/idempotency, offline privacy, D1 redaction and expiry, queue encryption/recovery/TTL/cap/FIFO/cancellation, dashboard security, prepare-time target-revision revalidation, fixed `clip.exe` behavior, lifecycle status, profile isolation, wrong-user blocking, relay-only secret isolation, and forbidden-source checks.
+Local verification currently records 170 package tests across 30 files and 23 migration-backed Workers tests. Coverage includes authorization, grammar, risk, HMAC/timestamp/replay/tamper/idempotency, offline privacy, D1 redaction and expiry, queue encryption/recovery/TTL/cap/FIFO/cancellation, dashboard security, prepare-time target-revision revalidation, fixed `clip.exe` behavior, lifecycle status, profile isolation, wrong-user blocking, relay-only secret isolation, deployment-variable forwarding, and forbidden-source checks.
 
-Formatting, typed lint, strict typecheck, all workspace builds, 166 package tests, 23 Workers tests, the 156-file secret scan, dependency audit, 22-file copy triage, Anti-AI scan, Human Cortex schema validation, and diff check passed again at the published relay checkpoint. The first immutable review's six low-severity findings were remediated before publication. Exact-SHA CI run `32608803657` passed for `900ac835f6b7ec7ede86dfd03a08cc9ad4991a66`.
+Formatting, typed lint, strict typecheck, all workspace builds, 170 package tests, 23 Workers tests, 24-file copy triage, the 158-file secret scan, dependency audit, Anti-AI scan, Human Cortex schema validation, installed-skill hash comparison, and diff check pass locally. The protected handoff skill passes its structural validator. The final diff security review, publication, and exact-SHA CI remain before release. The first immutable review's six low-severity findings remain remediated.
 
 These tests do not prove live Discord, OAuth, voice, Cloudflare, Container, or Socialize behavior.
 
 ## 6. Private resource state
 
-The private `VC Control Lab` server, `voice-control`, `voice-probe`, `VC Control`, and `Voice Rooms` were observed in an earlier authenticated setup checkpoint. `VC Control` was installed. An earlier seven-permission Voice Rooms consent was staged but never granted; it is obsolete for relay-only mode and must not be approved. Generate a new four-permission private relay consent instead.
+The private `VC Control Lab` server, `voice-control`, `voice-probe`, `VC Control`, and `Voice Rooms` were observed in authenticated setup. `VC Control` was installed. The owner confirmed the locked four-permission Voice Rooms installation. The earlier ungranted seven-permission consent is obsolete and was not used.
 
-Message Content was enabled manually, and the Developer Portal displayed `Bot successfully updated!`. The final Voice Rooms consent, protected credentials, command registration, live relay, and permission-denial matrix remain `UNVERIFIED`. No credential value appears in source or this report.
+Message Content was enabled manually, and the Developer Portal displayed `Bot successfully updated!`. Protected credentials, command registration, live relay, and the permission-denial matrix remain `UNVERIFIED`. `$discord-secret-handoff` is installed and opens a hidden user-only capture flow without viewing or copying values. No credential value appears in source or this report.
 
 ## 7. RPC and local queue state
 
@@ -63,7 +63,7 @@ The queue URL, dashboard session, RPC join/leave, restart recovery against a rea
 
 ## 8. Cloudflare and target state
 
-Workers Paid was observed as active. No current control Worker, D1 database, Durable Object, private voice host, Container probe, live URL, image revision, or rollback exercise is claimed.
+Workers Paid was observed as active. Wrangler 4.125.0 is OAuth-authenticated with the required Workers, D1, and Containers access. The control Worker passes full dry-run validation. The voice-host and probe pass Worker/configuration dry runs with Container rollout disabled. All three deployment lists are empty. Docker is absent, so no image build, Container runtime, live URL, D1 database, Durable Object, or rollback exercise is claimed.
 
 Socialize is untouched and `BLOCKED`. No project bot was installed, and no target was authorized, joined, messaged, modified, or measured. Staff must supply an approved window, exact voice/text targets, named account/operators, incident/removal contacts, and a supported persistent-room or timeout-exemption mechanism.
 
@@ -77,4 +77,4 @@ The external recovery patch and hash manifest preserve the inherited dirty check
 
 ## 10. Next live action
 
-Complete the locked four-permission Voice Rooms installation in `VC Control Lab`, then store the bot token and VC Control client secret through the ignored local protected prompt. After command registration and Cloudflare deployment configuration are ready, complete the protected OAuth flow for profile `main` while Discord desktop is signed into the intended account. Do not paste credentials into chat. A valid RPC checkpoint is a profile-bound authentication showing the expected user and exact private-lab target; only then run the private-lab queue and manual-send matrix.
+Use the visible **Discord Protected Credential Capture** window to store the Voice Rooms bot token and VC Control client secret through the two hidden prompts. Do not paste credentials into chat. After command registration and Cloudflare configuration are ready, complete the protected OAuth flow for profile `main` while Discord desktop is signed into the intended account. A valid RPC checkpoint is a profile-bound authentication showing the expected user and exact private-lab target; only then run the private-lab queue and manual-send matrix.

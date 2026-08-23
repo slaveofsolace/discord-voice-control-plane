@@ -14,9 +14,9 @@ The project has no user token, user Gateway, automatic user-account message, Dis
 
 ## Current evidence
 
-The source currently passes strict TypeScript checks, 166 package tests, and 23 migration-backed Workers tests. These local results cover relay intake, authenticated ingress, the encrypted queue, dashboard controls, RPC profile isolation, command grammar, Durable Object recovery, D1 persistence, managed rooms, and the silent official-bot voice state machine.
+The source currently passes strict TypeScript checks, 170 package tests, and 23 migration-backed Workers tests. These local results cover relay intake, authenticated ingress, deployment-variable isolation, the encrypted queue, dashboard controls, RPC profile isolation, command grammar, Durable Object recovery, D1 persistence, managed rooms, and the silent official-bot voice state machine.
 
-Live Discord and Cloudflare behavior remains separate from source verification. The private `VC Control Lab` server and requested channels exist, and Workers Paid was observed as active. The protected Voice Rooms install, Message Content setting, credentials, command registration, verified `main` RPC profile, live queue run, Worker deployment, and Container probe have not been proven in the current checkpoint.
+Live Discord and Cloudflare behavior remains separate from source verification. The private `VC Control Lab` server and requested channels exist. The owner confirmed the locked Voice Rooms installation, and the Developer Portal confirmed Message Content was saved. Protected credentials, command registration, a verified `main` RPC profile, live queue behavior, Worker deployment, and the Container probe remain unverified. Wrangler is authenticated and all Worker configurations pass dry-run validation; Docker is not installed, so no Container image or live voice proof exists.
 
 Socialize is untouched. Its path remains `BLOCKED` until staff supplies an approved window, exact target details, and a supported persistent-room or timeout-exemption mechanism. If no supported mechanism exists after an approved observation, record `TARGET RETENTION BLOCKED — NO SUPPORTED PERSISTENCE MECHANISM`.
 

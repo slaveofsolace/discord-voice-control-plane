@@ -25,8 +25,10 @@ Live completion is `PARTIAL`. Protected Discord grants, a verified `main` RPC pr
 | Profile isolation           | `main` preserved; separate profile/key/queue/lock; target/profile change invalidation                                       | `UNIT TESTED`        | Manually authorize and verify `main`               |
 | Forbidden paths absent      | Source-negative tests cover raw token, user Gateway, send API, UI keystrokes, PowerShell clipboard, audio, keepalive        | `UNIT TESTED`        | Preserve in future reviews                         |
 | Reusable official-bot path  | Managed rooms, slash/prefix commands, silent DAVE voice state, host/probe adapters retained                                 | `UNIT TESTED`        | Live official-bot and Container proof              |
-| Public wording and security | Copy triage, Anti-AI scan, 156-file secret scan, dependency audit, ledger validation, and diff check passed                 | `VALIDATED`          | Repeat these gates for later changes               |
-| Publication                 | `main` and `origin/main` matched at `900ac835f6b7ec7ede86dfd03a08cc9ad4991a66`; exact-SHA CI run `32608803657` passed       | `VALIDATED`          | Keep later evidence commits behind the same gates  |
+| Relay deployment adapter    | Typed argument builders forward the exact relay identity, allowlists, relay-only mode, and ingress URL to both Workers      | `UNIT TESTED`        | Deploy with real protected configuration           |
+| Credential handoff          | Validated repository and installed skill prepares a hidden TTY, user-only file, redacted verification, and owner handoff    | `VALIDATED`          | Owner enters the two protected Discord values      |
+| Public wording and security | 24-file copy triage, Anti-AI scan, 158-file secret scan, dependency audit, ledger validation, and diff check passed         | `VALIDATED`          | Repeat these gates for later changes               |
+| Publication                 | Prior public checkpoint `3d3309aba112303b5dd7d400da2b21daf8b2010b` passed exact-SHA CI run `32614534096`                    | `VALIDATED`          | Publish current commits only after fresh gates     |
 | Socialize                   | No bot install, authorization, join, message, modification, or measurement                                                  | `BLOCKED`            | Staff intake plus supported persistence/exemption  |
 
 ## Evidence boundaries
@@ -40,9 +42,11 @@ Live completion is `PARTIAL`. Protected Discord grants, a verified `main` RPC pr
 
 Workers Paid was observed as active, so no further payment step is presently identified. This does not prove deployment.
 
-A prior “auth granted” message was not tied to a verified, profile-bound `main` RPC identity and exact target. No protected profile content was opened for this audit. The earlier staged seven-permission Voice Rooms consent is obsolete; relay-only mode uses the four-permission private profile. The owner enabled Message Content for Voice Rooms, and the Developer Portal displayed `Bot successfully updated!`; the four-permission bot installation remains pending.
+A prior “auth granted” message was not tied to a verified, profile-bound `main` RPC identity and exact target. No protected profile content was opened for this audit. The earlier staged seven-permission Voice Rooms consent is obsolete. The owner confirmed the locked four-permission Voice Rooms installation, and the Developer Portal displayed `Bot successfully updated!` after Message Content was enabled. The bot token, VC Control client secret, command registration, and live relay remain unverified.
 
-The next live phase starts in the private lab. Login, MFA, CAPTCHA, credential display/copying, privileged-intent toggling, permission confirmation, and OAuth approval remain manual.
+Wrangler 4.125.0 is authenticated to the selected account. The control Worker passes a complete dry run, and the voice-host and probe Workers pass configuration dry runs with Container rollout disabled. None of the three Workers has a deployment. Docker is absent, so Wrangler cannot build either Container image locally and no Container runtime claim is supported.
+
+The next live phase starts in the private lab. `$discord-secret-handoff` opens the exact page, prepares the hidden user-only prompt, and verifies identity without revealing values. Login, MFA, CAPTCHA, credential creation/revelation/copying, permission confirmation, and OAuth approval remain manual.
 
 If approved target observation later establishes that ordinary authorized-member presence is insufficient and staff supplies no supported persistent or exempt configuration, record:
 
