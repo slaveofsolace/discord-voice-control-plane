@@ -21,7 +21,7 @@
     "@discordjs/voice": "0.19.2",
     "discord.js": "14.27.0",
     "ws": "8.21.3",
-    "zod": "4.4.3"
+    "zod": "4.5.4"
   },
   "devDependencies": {
     "@types/ws": "8.18.1"

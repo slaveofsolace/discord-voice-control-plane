@@ -15,6 +15,6 @@
     "clean": "node ../../scripts/clean-dist.mjs packages/contracts"
   },
   "dependencies": {
-    "zod": "4.4.3"
+    "zod": "4.5.4"
   }
 }

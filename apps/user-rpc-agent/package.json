@@ -18,7 +18,7 @@
     "@discord-vc-control/config": "workspace:*",
     "@discord-vc-control/contracts": "workspace:*",
     "@discord-vc-control/security": "workspace:*",
-    "zod": "4.4.3"
+    "zod": "4.5.4"
   },
   "devDependencies": {
     "@discord-vc-control/testing": "workspace:*"
