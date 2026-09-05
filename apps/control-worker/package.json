@@ -15,6 +15,6 @@
     "@discord-vc-control/contracts": "workspace:*",
     "@discord-vc-control/security": "workspace:*",
     "discord-interactions": "4.4.0",
-    "zod": "4.4.3"
+    "zod": "4.5.4"
   }
 }
