@@ -36,7 +36,7 @@
   },
   "devDependencies": {
     "@discord-vc-control/contracts": "workspace:*",
-    "@cloudflare/vitest-plugin": "1.0.0",
+    "@cloudflare/vitest-plugin": "1.1.3",
     "@cloudflare/workers-types": "5.20260822.1",
     "@eslint/js": "10.0.1",
     "@types/node": "24.13.3",
